@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jascartec — Sistema de Ventas de Celulares</title>
+
+    <!--=============== BOXICONS ===============-->
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+
+    <!--=============== GOOGLE FONTS ===============-->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- ===================== LOGIN SCREEN ===================== -->
+    <main class="login active" id="loginScreen">
+        <div class="login__container">
+            <div class="login__brand">
+                <i class='bx bx-mobile-alt login__brand-icon'></i>
+                <span class="login__brand-name">Jascartec</span>
+            </div>
+
+            <form class="login__form" id="formLogin" novalidate>
+                <div class="login__header">
+                    <h2 class="login__form-title">Bienvenido de nuevo</h2>
+                    <p class="login__form-description">Ingresa tus datos para acceder a tu cuenta</p>
+                </div>
+
+                <div class="login__group">
+                    <label for="loginUser" class="login__label">Usuario</label>
+                    <div class="login__box">
+                        <i class='bx bx-user login__icon'></i>
+                        <input type="text" id="loginUser" class="login__input" placeholder="admin" required autocomplete="username">
+                    </div>
+                </div>
+
+                <div class="login__group">
+                    <label for="loginPass" class="login__label">Contraseña</label>
+                    <div class="login__box">
+                        <i class='bx bx-lock-alt login__icon'></i>
+                        <input type="password" id="loginPass" class="login__input" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+                </div>
+
+                <div class="login__error" id="loginError"></div>
+
+                <button type="submit" class="login__button">
+                    <span class="login__button-text">Iniciar sesión</span>
+                    <i class='bx bx-right-arrow-alt'></i>
+                </button>
+
+                <div class="login__hint">
+                    <span>Cuentas de prueba:</span>
+                    <div class="login__hint-row"><strong>admin</strong> / admin123 — Administrador</div>
+                    <div class="login__hint-row"><strong>vendedor</strong> / vendedor123 — Vendedor</div>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <!-- ===================== APP CONTAINER ===================== -->
+    <div class="app" id="appContainer" style="display:none;">
+
+        <button class="sidebar-reopen" id="sidebarReopenBtn" onclick="toggleSidebar()" title="Mostrar menú">
+            <i class='bx bx-chevron-right'></i>
+        </button>
+
+        <!-- ===================== SIDEBAR ===================== -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar__brand">
+                <div class="sidebar__logo">
+                    <i class='bx bx-mobile-alt'></i>
+                    <span>Jascartec</span>
+                </div>
+                <button class="sidebar__toggle" onclick="toggleSidebar()" title="Ocultar menú">
+                    <i class='bx bx-chevron-left'></i>
+                </button>
+            </div>
+
+            <nav class="sidebar__nav">
+                <div class="nav-section">
+                    <span class="nav-label">General</span>
+                    <a href="#" class="nav-item active" data-view="dashboard" data-roles="Administrador,Vendedor">
+                        <i class='bx bx-grid-alt'></i> Dashboard
+                    </a>
+                    <a href="#" class="nav-item" data-view="inventario" data-roles="Administrador,Vendedor">
+                        <i class='bx bx-mobile'></i> Inventario
+                    </a>
+                    <a href="#" class="nav-item" data-view="ingresos" data-roles="Administrador">
+                        <i class='bx bx-download'></i> Ingresos
+                    </a>
+                    <a href="#" class="nav-item" data-view="ventas" data-roles="Administrador,Vendedor">
+                        <i class='bx bx-cart'></i> Ventas
+                    </a>
+                    <a href="#" class="nav-item" data-view="flujocaja" data-roles="Administrador">
+                        <i class='bx bx-wallet'></i> Flujo de Caja
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-label">Catálogo</span>
+                    <a href="#" class="nav-item" data-view="productos" data-roles="Administrador,Vendedor">
+                        <i class='bx bx-category'></i> Productos
+                    </a>
+                    <a href="#" class="nav-item" data-view="proveedores" data-roles="Administrador">
+                        <i class='bx bx-store'></i> Proveedores
+                    </a>
+                    <a href="#" class="nav-item" data-view="facturas" data-roles="Administrador">
+                        <i class='bx bx-file'></i> Facturas
+                    </a>
+                    <a href="#" class="nav-item" data-view="clientes" data-roles="Administrador,Vendedor">
+                        <i class='bx bx-group'></i> Clientes
+                    </a>
+                    <a href="#" class="nav-item" data-view="marcas" data-roles="Administrador">
+                        <i class='bx bx-purchase-tag'></i> Marcas
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-label">Sistema</span>
+                    <a href="#" class="nav-item" data-view="usuarios" data-roles="Administrador">
+                        <i class='bx bx-id-card'></i> Usuarios
+                    </a>
+                    <a href="#" class="nav-item" data-view="configuracion" data-roles="Administrador">
+                        <i class='bx bx-cog'></i> Configuración
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar__user">
+                <div class="sidebar__user-avatar" id="userAvatar">JC</div>
+                <div class="sidebar__user-info">
+                    <span class="sidebar__user-name" id="userName">Jorge Castillo</span>
+                    <span class="sidebar__user-role" id="userRole">Administrador</span>
+                </div>
+                <button class="sidebar__logout" onclick="logout()" title="Cerrar sesión">
+                    <i class='bx bx-log-out'></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- ===================== MAIN ===================== -->
+        <main class="main">
+            <header class="topbar">
+                <div>
+                    <h1 class="topbar__title" id="pageTitle">Dashboard</h1>
+                    <p class="topbar__subtitle" id="pageSubtitle">Resumen general de tu negocio</p>
+                </div>
+                <div class="topbar__search">
+                    <i class='bx bx-search'></i>
+                    <input type="text" id="globalSearch" placeholder="Buscar producto, IMEI, cliente...">
+                </div>
+            </header>
+
+            <div class="views">
+
+                <!-- ============== VIEW: DASHBOARD ============== -->
+                <section class="view active" id="view-dashboard">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-card__icon stat-card__icon--blue"><i class='bx bx-mobile-alt'></i></div>
+                            <span class="stat-card__label">Equipos disponibles</span>
+                            <span class="stat-card__value" id="statEquiposDisponibles">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card__icon stat-card__icon--green"><i class='bx bx-dollar-circle'></i></div>
+                            <span class="stat-card__label">Ventas del mes</span>
+                            <span class="stat-card__value" id="statVentasMes">S/ 0.00</span>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card__icon stat-card__icon--dark"><i class='bx bx-receipt'></i></div>
+                            <span class="stat-card__label">Boletas emitidas</span>
+                            <span class="stat-card__value" id="statBoletas">0</span>
+                        </div>
+                        <div class="stat-card stat-card--alert" id="cardStockBajo" onclick="openModal('modalStockBajo')">
+                            <div class="stat-card__icon stat-card__icon--red"><i class='bx bx-error'></i></div>
+                            <span class="stat-card__label">Stock bajo</span>
+                            <span class="stat-card__value" id="statStockBajo">0</span>
+                        </div>
+                        <div class="stat-card stat-card--alert" id="cardCobranzas" onclick="openModal('modalCobranzasPorVencer')">
+                            <div class="stat-card__icon stat-card__icon--amber"><i class='bx bx-time-five'></i></div>
+                            <span class="stat-card__label">Cobranzas por vencer</span>
+                            <span class="stat-card__value" id="statCobranzas">0</span>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card__header">
+                                <h3>Ventas — últimos 14 días</h3>
+                            </div>
+                            <canvas id="chartVentas" height="110"></canvas>
+                        </div>
+                        <div class="card">
+                            <div class="card__header">
+                                <h3>Ventas por marca</h3>
+                            </div>
+                            <canvas id="chartMarcas" height="110"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card__header">
+                            <h3>Modelos más vendidos</h3>
+                        </div>
+                        <canvas id="chartTopProductos" height="90"></canvas>
+                    </div>
+                </section>
+
+                <!-- ============== VIEW: INVENTARIO ============== -->
+                <section class="view" id="view-inventario">
+                    <div class="view__header">
+                        <div>
+                            <h2>Stock de equipos</h2>
+                            <p>Cada celular se controla por su IMEI individual</p>
+                        </div>
+                        <button class="btn btn--primary" onclick="openModal('modalProducto')" data-roles="Administrador">
+                            <i class='bx bx-plus'></i> Nuevo Modelo
+                        </button>
+                    </div>
+
+                    <div class="toolbar">
+                        <div class="toolbar__search">
+                            <i class='bx bx-search'></i>
+                            <input type="text" id="invSearch" placeholder="Buscar por modelo, marca o código...">
+                        </div>
+                        <select id="filterMarca">
+                            <option value="">Todas las marcas</option>
+                        </select>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table class="table" id="tablaInventario">
+                            <thead>
+                                <tr>
+                                    <th>Modelo</th>
+                                    <th>Marca</th>
+                                    <th>Disponibles</th>
+                                    <th>Precio</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventarioBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ============== VIEW: INGRESOS ============== -->
+                <section class="view" id="view-ingresos">
+                    <div class="view__header">
+                        <div>
+                            <h2>Compras y recepción de equipos</h2>
+                            <p>Registra los IMEIs de cada equipo que ingresa</p>
+                        </div>
+                        <button class="btn btn--primary" onclick="openModal('modalIngreso')">
+                            <i class='bx bx-plus'></i> Registrar Ingreso
+                        </button>
+                    </div>
+
+                    <div class="toolbar">
+                        <div class="toolbar__search">
+                            <i class='bx bx-search'></i>
+                            <input type="text" id="ingSearch" placeholder="Buscar por N° de factura, proveedor o IMEI...">
+                        </div>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Proveedor</th>
+                                    <th>Factura</th>
+                                    <th>Equipos</th>
+                                    <th>Total</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ingresosBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ============== VIEW: VENTAS ============== -->
+                <section class="view" id="view-ventas">
+                    <div class="view__header">
+                        <div>
+                            <h2>Registro de ventas</h2>
+                            <p>Vende equipos específicos por IMEI</p>
+                        </div>
+                        <button class="btn btn--primary" onclick="openModal('modalVenta')">
+                            <i class='bx bx-plus'></i> Registrar Venta
+                        </button>
+                    </div>
+
+                    <div class="stats-grid stats-grid--compact">
+                        <div class="stat-card">
+                            <span class="stat-card__label">Total facturado</span>
+                            <span class="stat-card__value" id="ventasTotalFacturado">S/ 0.00</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-card__label">Ticket promedio</span>
+                            <span class="stat-card__value" id="ventasTicketProm">S/ 0.00</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-card__label">Modelo top</span>
+                            <span class="stat-card__value stat-card__value--sm" id="ventasProductoTop">—</span>
+                        </div>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Boleta</th>
+                                    <th>Fecha</th>
+                                    <th>Cliente</th>
+                                    <th>Equipos</th>
+                                    <th>Total</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ventasBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ============== VIEW: FLUJO DE CAJA ============== -->
+                <section class="view" id="view-flujocaja">
+                    <div class="view__header">
+                        <div>
+                            <h2>Flujo de caja</h2>
+                            <p>Todo lo que entra y sale de tu negocio</p>
+                        </div>
+                        <div class="date-filters">
+                            <label>Desde <input type="date" id="cajaDesde"></label>
+                            <label>Hasta <input type="date" id="cajaHasta"></label>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid stats-grid--compact">
+                        <div class="stat-card">
+                            <span class="stat-card__label">Entradas del período</span>
+                            <span class="stat-card__value stat-card__value--green" id="cajaEntradas">S/ 0.00</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-card__label">Salidas del período</span>
+                            <span class="stat-card__value stat-card__value--red" id="cajaSalidas">S/ 0.00</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-card__label">Saldo del período</span>
+                            <span class="stat-card__value" id="cajaSaldo">S/ 0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card__header"><h3>Entradas vs. Salidas — últimos 6 meses</h3></div>
+                        <canvas id="chartFlujoCaja" height="100"></canvas>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Concepto</th>
+                                    <th>Monto</th>
+                                    <th>Saldo acumulado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="flujoCajaBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- ============== VIEW: PRODUCTOS ============== -->
+                <section class="view" id="view-productos">
+                    <div class="view__header">
+                        <div>
+                            <h2>Catálogo de modelos</h2>
+                            <p>Los modelos de celular que maneja tu negocio</p>
+                        </div>
+                    </div>
+                    <div class="cards-grid" id="productosGrid"></div>
+                </section>
+
+                <!-- ============== VIEW: PROVEEDORES ============== -->
+                <section class="view" id="view-proveedores">
+                    <div class="view__header">
+                        <div>
+                            <h2>Tus aliados comerciales</h2>
+                        </div>
+                        <button class="btn btn--primary" onclick="openModal('modalProveedor')">
+                            <i class='bx bx-plus'></i> Nuevo Proveedor
+                        </button>
+                    </div>
+                    <div class="cards-grid" id="proveedoresGrid"></div>
+                </section>
+
+                <!-- ============== VIEW: FACTURAS ============== -->
+                <section class="view" id="view-facturas">
+                    <div class="view__header">
+                        <div>
+                            <h2>Cuentas por pagar a proveedores</h2>
+                        </div>
+                        <button class="btn btn--primary" onclick="openModal('modalFactura')">
+                            <i class='bx bx-plus'></i> Nueva Factura
+                        </button>
+                    </div>
+                    <div class="cards-grid" id="facturasGrid"></div>
+                </section>
+
+                <!-- ============== VIEW: CLIENTES ============== -->
+                <section class="view" id="view-clientes">
+                    <div class="view__header">
+                        <div>
+                            <h2>Tu cartera de clientes</h2>
+                        </div>
+                        <button class="btn btn--primary" onclick="openModal('modalCliente')">
+                            <i class='bx bx-plus'></i> Nuevo Cliente
+                        </button>
+                    </div>
+                    <div class="cards-grid" id="clientesGrid"></div>
+                </section>
+
+                <!-- ============== VIEW: MARCAS ============== -->
+                <section class="view" id="view-marcas">
+                    <div class="view__header">
+                        <div>
+                            <h2>Marcas</h2>
+                            <p>Las marcas que se usan al registrar modelos</p>
+                        </div>
+                        <button class="btn btn--primary" onclick="openModal('modalMarca')">
+                            <i class='bx bx-plus'></i> Nueva Marca
+                        </button>
+                    </div>
+                    <div class="maint-list" id="marcasList"></div>
+                </section>
+
+                <!-- ============== VIEW: USUARIOS ============== -->
+                <section class="view" id="view-usuarios">
+                    <div class="view__header">
+                        <div>
+                            <h2>Usuarios del sistema</h2>
+                        </div>
+                        <button class="btn btn--primary" onclick="openModal('modalUsuario')">
+                            <i class='bx bx-plus'></i> Nuevo Usuario
+                        </button>
+                    </div>
+                    <div class="cards-grid" id="usuariosGrid"></div>
+                </section>
+
+                <!-- ============== VIEW: CONFIGURACIÓN ============== -->
+                <section class="view" id="view-configuracion">
+                    <div class="view__header">
+                        <div>
+                            <h2>Configuración</h2>
+                            <p>Respaldos y administración del sistema</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card__header"><h3>Respaldo de datos</h3></div>
+                        <p class="muted">Exporta toda la información del sistema a un archivo, o restaura un respaldo anterior.</p>
+                        <div class="config-actions">
+                            <button class="btn btn--primary" onclick="exportBackup()"><i class='bx bx-download'></i> Exportar respaldo</button>
+                            <label class="btn btn--outline">
+                                <i class='bx bx-upload'></i> Importar respaldo
+                                <input type="file" id="importFile" accept=".json" style="display:none;">
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ===================== MODALES ===================== -->
+
+    <!-- Producto (modelo) -->
+    <div class="modal" id="modalProducto">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalProductoTitle">Nuevo Modelo</h3>
+                <button class="modal__close" onclick="closeModal('modalProducto')"><i class='bx bx-x'></i></button>
+            </div>
+            <form class="modal__body" id="formProducto">
+                <input type="hidden" id="prodId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Marca</label>
+                        <select id="prodMarca" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Modelo</label>
+                        <input type="text" id="prodModelo" required placeholder="Ej: Galaxy A54">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Almacenamiento</label>
+                        <input type="text" id="prodAlmacenamiento" required placeholder="Ej: 128GB">
+                    </div>
+                    <div class="form-group">
+                        <label>RAM</label>
+                        <input type="text" id="prodRam" required placeholder="Ej: 8GB">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Color</label>
+                        <input type="text" id="prodColor" required placeholder="Ej: Negro">
+                    </div>
+                    <div class="form-group">
+                        <label>Gama</label>
+                        <select id="prodGama" required>
+                            <option value="Baja">Baja</option>
+                            <option value="Media">Media</option>
+                            <option value="Alta">Alta</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Precio de venta (S/)</label>
+                        <input type="number" id="prodPrecio" required step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Costo referencial (S/)</label>
+                        <input type="number" id="prodCosto" required step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Proveedor preferido</label>
+                    <select id="prodProveedor" required></select>
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">Guardar Modelo</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Ingreso (compra) -->
+    <div class="modal modal--wide" id="modalIngreso">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Registrar Ingreso</h3>
+                <button class="modal__close" onclick="closeModal('modalIngreso')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Proveedor</label>
+                        <select id="ingProveedor"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>N° de factura (opcional)</label>
+                        <input type="text" id="ingFactura" placeholder="Ej: F001-5521">
+                    </div>
+                </div>
+
+                <div class="form-row form-row--imei">
+                    <div class="form-group">
+                        <label>Modelo</label>
+                        <select id="ingProducto"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>IMEI</label>
+                        <input type="text" id="ingImei" placeholder="15 dígitos" maxlength="15">
+                    </div>
+                    <div class="form-group">
+                        <label>Costo unitario (S/)</label>
+                        <input type="number" id="ingCosto" step="0.01" min="0">
+                    </div>
+                    <button type="button" class="btn btn--outline" id="ingAgregarBtn" onclick="agregarEquipoIngreso()">
+                        <i class='bx bx-plus'></i> Agregar
+                    </button>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table table--sm">
+                        <thead><tr><th>Modelo</th><th>IMEI</th><th>Costo</th><th></th></tr></thead>
+                        <tbody id="ingresoCartBody"></tbody>
+                    </table>
+                </div>
+                <div class="cart-summary" id="ingresoResumen">Aún no ha agregado equipos</div>
+
+                <button type="button" class="btn btn--primary btn--full" onclick="confirmarIngreso()">Confirmar Ingreso</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detalle de ingreso -->
+    <div class="modal modal--wide" id="modalDetalleIngreso">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalDetalleIngresoTitle">Detalle de Ingreso</h3>
+                <button class="modal__close" onclick="closeModal('modalDetalleIngreso')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body" id="detalleIngresoContent"></div>
+        </div>
+    </div>
+
+    <!-- Venta -->
+    <div class="modal modal--wide" id="modalVenta">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Registrar Venta</h3>
+                <button class="modal__close" onclick="closeModal('modalVenta')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Cliente</label>
+                        <select id="venCliente"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Forma de pago</label>
+                        <select id="venFormaPago" onchange="toggleCampoCredito()">
+                            <option value="Contado">Contado</option>
+                            <option value="Crédito">Crédito</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" id="venFechaCreditoWrap" style="display:none;">
+                    <label>Fecha de pago acordada</label>
+                    <input type="date" id="venFechaPagoAcordada">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Modelo</label>
+                        <select id="venProductoSel" onchange="cargarEquiposDisponiblesVenta()"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>IMEI disponible</label>
+                        <select id="venEquipoSel"></select>
+                    </div>
+                    <button type="button" class="btn btn--outline" onclick="agregarProductoVenta()">
+                        <i class='bx bx-plus'></i> Agregar
+                    </button>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table table--sm">
+                        <thead><tr><th>Modelo</th><th>IMEI</th><th>Precio</th><th></th></tr></thead>
+                        <tbody id="ventaCartBody"></tbody>
+                    </table>
+                </div>
+                <div class="cart-summary" id="ventaResumen">Aún no ha agregado equipos</div>
+
+                <button type="button" class="btn btn--primary btn--full" onclick="confirmarVenta()">Confirmar Venta</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boleta -->
+    <div class="modal modal--wide" id="modalBoleta">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Nota de Venta</h3>
+                <button class="modal__close" onclick="closeModal('modalBoleta')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body" id="boletaContent"></div>
+        </div>
+    </div>
+
+    <!-- Cliente -->
+    <div class="modal" id="modalCliente">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalClienteTitle">Nuevo Cliente</h3>
+                <button class="modal__close" onclick="closeModal('modalCliente')"><i class='bx bx-x'></i></button>
+            </div>
+            <form class="modal__body" id="formCliente">
+                <input type="hidden" id="cliId">
+                <div class="form-group">
+                    <label>Nombre / Razón social</label>
+                    <input type="text" id="cliNombre" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Documento</label>
+                        <input type="text" id="cliDocumento" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="cliTipo" required>
+                            <option value="Particular">Particular</option>
+                            <option value="Empresa">Empresa</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Persona de contacto</label>
+                    <input type="text" id="cliContacto" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="text" id="cliTelefono" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="cliEmail" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <input type="text" id="cliDireccion" required>
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">Guardar Cliente</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Proveedor -->
+    <div class="modal" id="modalProveedor">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalProveedorTitle">Nuevo Proveedor</h3>
+                <button class="modal__close" onclick="closeModal('modalProveedor')"><i class='bx bx-x'></i></button>
+            </div>
+            <form class="modal__body" id="formProveedor">
+                <input type="hidden" id="provId">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="provNombre" required>
+                </div>
+                <div class="form-group">
+                    <label>Persona de contacto</label>
+                    <input type="text" id="provContacto" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="text" id="provTelefono" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="provEmail" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <input type="text" id="provDireccion" required>
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">Guardar Proveedor</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Marca -->
+    <div class="modal" id="modalMarca">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalMarcaTitle">Nueva Marca</h3>
+                <button class="modal__close" onclick="closeModal('modalMarca')"><i class='bx bx-x'></i></button>
+            </div>
+            <form class="modal__body" id="formMarca">
+                <input type="hidden" id="marId">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="marNombre" required placeholder="Ej: Samsung">
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">Guardar Marca</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Usuario -->
+    <div class="modal" id="modalUsuario">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalUsuarioTitle">Nuevo Usuario</h3>
+                <button class="modal__close" onclick="closeModal('modalUsuario')"><i class='bx bx-x'></i></button>
+            </div>
+            <form class="modal__body" id="formUsuario">
+                <input type="hidden" id="usrId">
+                <div class="form-group">
+                    <label>Nombre completo</label>
+                    <input type="text" id="usrNombre" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Usuario (para iniciar sesión)</label>
+                        <input type="text" id="usrUsuario" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Rol</label>
+                        <select id="usrRol" required>
+                            <option value="Administrador">Administrador</option>
+                            <option value="Vendedor">Vendedor</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="usrPassword" placeholder="Dejar en blanco para no cambiarla">
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">Guardar Usuario</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Factura -->
+    <div class="modal" id="modalFactura">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Nueva Factura</h3>
+                <button class="modal__close" onclick="closeModal('modalFactura')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body">
+                <div class="form-group">
+                    <label>Proveedor</label>
+                    <select id="facProveedor"></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>N° de factura</label>
+                        <input type="text" id="facNumero">
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="facFecha">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Monto total (S/)</label>
+                        <input type="number" id="facMonto" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>N° de letras</label>
+                        <input type="number" id="facNumLetras" min="1" value="1">
+                    </div>
+                </div>
+                <button type="button" class="btn btn--outline btn--full" onclick="generarLetras()">Generar letras</button>
+
+                <div class="table-wrap" id="facLetrasWrapper" style="display:none;">
+                    <table class="table table--sm">
+                        <thead><tr><th>#</th><th>Monto</th><th>Vencimiento</th></tr></thead>
+                        <tbody id="facLetrasBody"></tbody>
+                    </table>
+                </div>
+
+                <button type="button" class="btn btn--primary btn--full" onclick="guardarFactura()">Guardar Factura</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detalle de factura (letras) -->
+    <div class="modal" id="modalDetalleFactura">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalDetalleFacturaTitle">Factura</h3>
+                <button class="modal__close" onclick="closeModal('modalDetalleFactura')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body" id="detalleFacturaList"></div>
+        </div>
+    </div>
+
+    <!-- Gestión de pago (ventas a crédito) -->
+    <div class="modal" id="modalGestionPago">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalGestionPagoTitle">Pago</h3>
+                <button class="modal__close" onclick="closeModal('modalGestionPago')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body" id="gestionPagoContent"></div>
+        </div>
+    </div>
+
+    <!-- Stock bajo -->
+    <div class="modal" id="modalStockBajo">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Modelos con stock bajo</h3>
+                <button class="modal__close" onclick="closeModal('modalStockBajo')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body list-modal" id="stockBajoList"></div>
+        </div>
+    </div>
+
+    <!-- Cobranzas por vencer -->
+    <div class="modal" id="modalCobranzasPorVencer">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Cobranzas por vencer</h3>
+                <button class="modal__close" onclick="closeModal('modalCobranzasPorVencer')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body list-modal" id="cobranzasPorVencerList"></div>
+        </div>
+    </div>
+
+    <!-- Confirmación genérica -->
+    <div class="modal" id="modalConfirm">
+        <div class="modal__box modal__box--sm">
+            <div class="modal__body confirm-body">
+                <div class="confirm-icon"><i class='bx bx-error-circle'></i></div>
+                <h3 id="confirmTitle">¿Confirmar acción?</h3>
+                <p id="confirmMessage"></p>
+                <div class="confirm-actions">
+                    <button class="btn btn--outline" id="confirmCancelBtn">Cancelar</button>
+                    <button class="btn btn--danger" id="confirmOkBtn">Sí, continuar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== TOAST ===================== -->
+    <div class="toast" id="toast"></div>
+
+    <script src="data.js"></script>
+    <script src="storage.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
