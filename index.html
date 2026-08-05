@@ -388,8 +388,43 @@
                             <h2>Catálogo de modelos</h2>
                             <p>Los modelos de celular que maneja tu negocio</p>
                         </div>
+                        <button class="btn btn--primary" onclick="openModal('modalProducto')" data-roles="Administrador">
+                            <i class='bx bx-plus'></i> Nuevo Modelo
+                        </button>
                     </div>
-                    <div class="cards-grid" id="productosGrid"></div>
+
+                    <div class="catalog-layout">
+                        <aside class="catalog-filters">
+                            <h4>Filtros</h4>
+                            <div class="form-group">
+                                <label>Buscar</label>
+                                <input type="text" id="catSearch" placeholder="Modelo, marca...">
+                            </div>
+                            <div class="form-group">
+                                <label>Marca</label>
+                                <select id="catFiltroMarca"><option value="">Todas</option></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Gama</label>
+                                <select id="catFiltroGama">
+                                    <option value="">Todas</option>
+                                    <option value="Baja">Baja</option>
+                                    <option value="Media">Media</option>
+                                    <option value="Alta">Alta</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Ordenar por</label>
+                                <select id="catOrden">
+                                    <option value="relevancia">Relevancia</option>
+                                    <option value="precio-asc">Precio: menor a mayor</option>
+                                    <option value="precio-desc">Precio: mayor a menor</option>
+                                    <option value="nombre">Nombre A-Z</option>
+                                </select>
+                            </div>
+                        </aside>
+                        <div class="catalog-grid" id="productosGrid"></div>
+                    </div>
                 </section>
 
                 <!-- ============== VIEW: PROVEEDORES ============== -->
@@ -494,6 +529,18 @@
             </div>
             <form class="modal__body" id="formProducto">
                 <input type="hidden" id="prodId">
+                <div class="form-group">
+                    <label>Foto del modelo (opcional)</label>
+                    <div class="image-upload" id="prodImagenUpload" onclick="$('#prodImagenInput').click()">
+                        <img id="prodImagenPreview" src="" style="display:none;" alt="Vista previa">
+                        <div class="image-upload__placeholder" id="prodImagenPlaceholder">
+                            <i class='bx bx-image-add'></i>
+                            <span>Subir foto</span>
+                        </div>
+                    </div>
+                    <input type="file" id="prodImagenInput" accept="image/*" style="display:none;">
+                    <small class="muted" id="prodImagenHint">Sin foto se muestra un ícono genérico según la marca</small>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Marca</label>
@@ -634,11 +681,25 @@
                     <input type="date" id="venFechaPagoAcordada">
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Modelo</label>
-                        <select id="venProductoSel" onchange="cargarEquiposDisponiblesVenta()"></select>
+                <div class="form-group">
+                    <label>Modelo</label>
+                    <div class="model-picker-trigger" id="venModeloTrigger" onclick="abrirSelectorModelo()">
+                        <div class="model-picker-trigger__empty" id="venModeloEmpty">
+                            <span>Elegir modelo por foto...</span>
+                            <i class='bx bx-chevron-right'></i>
+                        </div>
+                        <div class="model-picker-trigger__selected" id="venModeloSelected" style="display:none;">
+                            <img id="venModeloImg" src="" alt="">
+                            <div class="model-picker-trigger__info">
+                                <strong id="venModeloNombre"></strong>
+                                <span id="venModeloPrecio"></span>
+                            </div>
+                            <button type="button" class="btn-small-outline">Cambiar</button>
+                        </div>
                     </div>
+                </div>
+
+                <div class="form-row">
                     <div class="form-group">
                         <label>IMEI disponible</label>
                         <select id="venEquipoSel"></select>
@@ -657,6 +718,23 @@
                 <div class="cart-summary" id="ventaResumen">Aún no ha agregado equipos</div>
 
                 <button type="button" class="btn btn--primary btn--full" onclick="confirmarVenta()">Confirmar Venta</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selector visual de modelo (dentro de Registrar Venta) -->
+    <div class="modal modal--wide" id="modalSelectorModelo">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Elegir modelo</h3>
+                <button class="modal__close" onclick="closeModal('modalSelectorModelo')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body">
+                <div class="model-picker-search">
+                    <i class='bx bx-search'></i>
+                    <input type="text" id="selectorModeloSearch" placeholder="Buscar por modelo o marca...">
+                </div>
+                <div class="model-picker-grid" id="selectorModeloGrid"></div>
             </div>
         </div>
     </div>

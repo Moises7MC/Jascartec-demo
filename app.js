@@ -31,6 +31,30 @@ const findCliente = (id) => clientes.find(c => c.id === id);
 const findMarca = (id) => marcas.find(m => m.id === id);
 const nombreProducto = (p) => p ? `${p.marca} ${p.modelo} ${p.almacenamiento} ${p.color}` : '(modelo eliminado)';
 
+// ===================== IMÁGENES DE PRODUCTO =====================
+// Mientras no haya foto real, se genera una silueta de celular coloreada
+// según la marca — así el catálogo se ve visual desde el día uno, sin
+// depender de subir fotos ni de descargar nada de internet.
+const MARCA_COLORS = { 'Samsung': '#111827', 'Apple': '#4b5563', 'Xiaomi': '#ff6b00', 'Motorola': '#7c3aed' };
+function colorPorMarca(marca) {
+    if (MARCA_COLORS[marca]) return MARCA_COLORS[marca];
+    let hash = 0;
+    for (let i = 0; i < marca.length; i++) hash = marca.charCodeAt(i) + ((hash << 5) - hash);
+    return `hsl(${Math.abs(hash) % 360}, 55%, 42%)`;
+}
+function placeholderImagenProducto(producto) {
+    const color = colorPorMarca(producto.marca);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+        <rect width="200" height="200" rx="24" fill="#eef1f5"/>
+        <rect x="72" y="32" width="56" height="136" rx="13" fill="${color}"/>
+        <rect x="78" y="45" width="44" height="98" rx="4" fill="#ffffff" opacity="0.14"/>
+        <circle cx="100" cy="155" r="4" fill="#ffffff" opacity="0.55"/>
+        <circle cx="112" cy="40" r="2.5" fill="#ffffff" opacity="0.4"/>
+    </svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+const productoImagenSrc = (p) => (p && p.imagen) ? p.imagen : placeholderImagenProducto(p || { marca: '' });
+
 // ===================== STOCK =====================
 const equiposDisponibles = (productoId) => equipos.filter(e => e.productoId === productoId && e.estadoVenta === 'Disponible');
 const stockDisponible = (productoId) => equiposDisponibles(productoId).length;
@@ -241,6 +265,9 @@ function openModal(id) {
         $('#modalProductoTitle').textContent = 'Nuevo Modelo';
         $('#prodId').value = '';
         $('#formProducto').reset();
+        prodImagenData = null;
+        $('#prodImagenPreview').style.display = 'none';
+        $('#prodImagenPlaceholder').style.display = '';
         populateSelectMarcasProducto();
         populateSelectProveedores('#prodProveedor');
     }
@@ -254,13 +281,18 @@ function openModal(id) {
     }
     if (id === 'modalVenta') {
         ventaCart = [];
+        venModeloSeleccionado = null;
         populateSelectClientes('#venCliente');
-        populateSelectProductos('#venProductoSel');
         $('#venFormaPago').value = 'Contado';
         $('#venFechaPagoAcordada').value = '';
         toggleCampoCredito();
-        cargarEquiposDisponiblesVenta();
+        actualizarTriggerModelo();
+        $('#venEquipoSel').innerHTML = '';
         renderVentaCart();
+    }
+    if (id === 'modalSelectorModelo') {
+        $('#selectorModeloSearch').value = '';
+        renderSelectorModeloGrid();
     }
     if (id === 'modalCliente') {
         $('#modalClienteTitle').textContent = 'Nuevo Cliente';
@@ -444,7 +476,12 @@ function renderInventario() {
         const est = estadoStock(cant);
         return `
             <tr>
-                <td><strong>${nombreProducto(p)}</strong><br><small class="muted">${p.codigo}</small></td>
+                <td>
+                    <div class="table-thumb-row">
+                        <img class="table-thumb" src="${productoImagenSrc(p)}" alt="">
+                        <div><strong>${nombreProducto(p)}</strong><br><small class="muted">${p.codigo}</small></div>
+                    </div>
+                </td>
                 <td>${p.marca}</td>
                 <td>${cant}</td>
                 <td>${formatPEN(p.precio)}</td>
@@ -468,6 +505,22 @@ $('#globalSearch').addEventListener('input', (e) => {
 });
 
 // ===================== PRODUCTOS (CRUD) =====================
+// Imagen subida en el modal (base64). null = no se tocó / usar placeholder.
+let prodImagenData = null;
+$('#prodImagenInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast('✗ Seleccione un archivo de imagen', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        prodImagenData = ev.target.result;
+        $('#prodImagenPreview').src = prodImagenData;
+        $('#prodImagenPreview').style.display = '';
+        $('#prodImagenPlaceholder').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+});
+
 $('#formProducto').addEventListener('submit', (e) => {
     e.preventDefault();
     const id = $('#prodId').value;
@@ -486,11 +539,13 @@ $('#formProducto').addEventListener('submit', (e) => {
     if (id) {
         const p = findProducto(parseInt(id));
         Object.assign(p, data);
+        if (prodImagenData) p.imagen = prodImagenData; // solo se reemplaza si subió una foto nueva
         toast(`✓ Modelo "${nombreProducto(p)}" actualizado`, 'success');
     } else {
         const nuevo = {
             id: nextProductoId++,
             codigo: `${data.marca.slice(0, 3).toUpperCase()}-${nextProductoId - 1}`,
+            imagen: prodImagenData,
             ...data
         };
         productos.push(nuevo);
@@ -505,6 +560,10 @@ function editarProducto(id) {
     if (!p) return;
     openModal('modalProducto');
     $('#modalProductoTitle').textContent = 'Editar Modelo';
+    prodImagenData = null;
+    $('#prodImagenPreview').src = productoImagenSrc(p);
+    $('#prodImagenPreview').style.display = '';
+    $('#prodImagenPlaceholder').style.display = 'none';
     $('#prodId').value = p.id;
     $('#prodMarca').value = p.marca;
     $('#prodModelo').value = p.modelo;
@@ -539,27 +598,65 @@ async function eliminarProducto(id) {
     }
 }
 
+function populateFiltroMarcaCatalogo() {
+    const sel = $('#catFiltroMarca');
+    const actual = sel.value;
+    sel.innerHTML = '<option value="">Todas</option>' + marcas.map(m => `<option value="${m.nombre}">${m.nombre}</option>`).join('');
+    sel.value = actual;
+}
+
 function renderProductos() {
-    if (!productos.length) {
-        $('#productosGrid').innerHTML = '<div class="empty-state">Aún no hay modelos registrados</div>';
+    populateFiltroMarcaCatalogo();
+
+    const busqueda = ($('#catSearch').value || '').toLowerCase();
+    const marcaFiltro = $('#catFiltroMarca').value;
+    const gamaFiltro = $('#catFiltroGama').value;
+    const orden = $('#catOrden').value;
+
+    let lista = productos.filter(p => {
+        const texto = `${nombreProducto(p)} ${p.codigo}`.toLowerCase();
+        return texto.includes(busqueda) && (!marcaFiltro || p.marca === marcaFiltro) && (!gamaFiltro || p.gama === gamaFiltro);
+    });
+
+    if (orden === 'precio-asc') lista.sort((a, b) => a.precio - b.precio);
+    else if (orden === 'precio-desc') lista.sort((a, b) => b.precio - a.precio);
+    else if (orden === 'nombre') lista.sort((a, b) => nombreProducto(a).localeCompare(nombreProducto(b)));
+
+    if (!lista.length) {
+        $('#productosGrid').innerHTML = '<div class="empty-state">No se encontraron modelos con esos filtros</div>';
         return;
     }
-    $('#productosGrid').innerHTML = productos.map(p => {
+
+    const isAdmin = currentUser?.rol === 'Administrador';
+    $('#productosGrid').innerHTML = lista.map(p => {
         const cant = stockDisponible(p.id);
         const est = estadoStock(cant);
         return `
-            <div class="entity-card">
-                <div class="entity-card__icon"><i class='bx bx-mobile-alt'></i></div>
-                <div class="entity-name">${nombreProducto(p)}</div>
-                <span class="tag tag-dark">${p.marca}</span>
-                <span class="tag ${est.tag}">${cant} disponibles</span>
-                <div class="entity-info">💾 ${p.almacenamiento} · ${p.ram} RAM</div>
-                <div class="entity-info">💰 ${formatPEN(p.precio)}</div>
-                <div class="entity-info">🏷️ ${p.codigo}</div>
+            <div class="product-photo-card">
+                <div class="product-photo-card__img"><img src="${productoImagenSrc(p)}" alt="${nombreProducto(p)}"></div>
+                <div class="product-photo-card__body">
+                    <div class="product-photo-card__tags">
+                        <span class="tag tag-dark">${p.marca}</span>
+                        <span class="tag ${est.tag}">${cant} disponibles</span>
+                    </div>
+                    <div class="product-photo-card__name">${nombreProducto(p)}</div>
+                    <div class="product-photo-card__meta">${p.almacenamiento} · ${p.ram} RAM · ${p.codigo}</div>
+                    <div class="product-photo-card__price">${formatPEN(p.precio)}</div>
+                    ${isAdmin ? `
+                        <div class="product-photo-card__actions">
+                            <button class="btn-small" onclick="editarProducto(${p.id})">Editar</button>
+                            <button class="btn-small-danger" onclick="eliminarProducto(${p.id})">Eliminar</button>
+                        </div>
+                    ` : ''}
+                </div>
             </div>
         `;
     }).join('');
 }
+$('#catSearch').addEventListener('input', renderProductos);
+$('#catFiltroMarca').addEventListener('change', renderProductos);
+$('#catFiltroGama').addEventListener('change', renderProductos);
+$('#catOrden').addEventListener('change', renderProductos);
 
 // ===================== MARCAS (CRUD) =====================
 $('#formMarca').addEventListener('submit', (e) => {
@@ -794,6 +891,7 @@ $('#ingSearch').addEventListener('input', renderIngresos);
 
 // ===================== VENTAS =====================
 let ventaCart = [];
+let venModeloSeleccionado = null; // productoId elegido en el selector visual
 
 function toggleCampoCredito() {
     const esCredito = $('#venFormaPago').value === 'Crédito';
@@ -801,10 +899,60 @@ function toggleCampoCredito() {
     $('#venFechaPagoAcordada').required = esCredito;
 }
 
+// ---------- Selector visual de modelo (elegir por foto) ----------
+function abrirSelectorModelo() {
+    openModal('modalSelectorModelo');
+}
+
+function renderSelectorModeloGrid() {
+    const busqueda = ($('#selectorModeloSearch').value || '').toLowerCase();
+    const lista = productos.filter(p => nombreProducto(p).toLowerCase().includes(busqueda));
+
+    if (!lista.length) {
+        $('#selectorModeloGrid').innerHTML = '<div class="empty-state">No se encontraron modelos</div>';
+        return;
+    }
+    $('#selectorModeloGrid').innerHTML = lista.map(p => {
+        const cant = stockDisponible(p.id);
+        return `
+            <button type="button" class="model-picker-card" onclick="elegirModeloVenta(${p.id})" ${cant === 0 ? 'disabled' : ''}>
+                <div class="model-picker-card__img"><img src="${productoImagenSrc(p)}" alt="${nombreProducto(p)}"></div>
+                <div class="model-picker-card__body">
+                    <div class="model-picker-card__name">${nombreProducto(p)}</div>
+                    <div class="model-picker-card__price">${formatPEN(p.precio)}</div>
+                    <div class="model-picker-card__stock">${cant > 0 ? `${cant} disponible${cant === 1 ? '' : 's'}` : 'Sin stock'}</div>
+                </div>
+            </button>
+        `;
+    }).join('');
+}
+$('#selectorModeloSearch').addEventListener('input', renderSelectorModeloGrid);
+
+function elegirModeloVenta(productoId) {
+    venModeloSeleccionado = productoId;
+    actualizarTriggerModelo();
+    closeModal('modalSelectorModelo');
+    cargarEquiposDisponiblesVenta();
+}
+
+function actualizarTriggerModelo() {
+    const p = venModeloSeleccionado ? findProducto(venModeloSeleccionado) : null;
+    if (!p) {
+        $('#venModeloEmpty').style.display = '';
+        $('#venModeloSelected').style.display = 'none';
+        return;
+    }
+    $('#venModeloEmpty').style.display = 'none';
+    $('#venModeloSelected').style.display = '';
+    $('#venModeloImg').src = productoImagenSrc(p);
+    $('#venModeloNombre').textContent = nombreProducto(p);
+    $('#venModeloPrecio').textContent = formatPEN(p.precio);
+}
+
 function cargarEquiposDisponiblesVenta() {
-    const productoId = parseInt($('#venProductoSel').value);
+    if (!venModeloSeleccionado) { $('#venEquipoSel').innerHTML = ''; return; }
     const usados = ventaCart.map(it => it.equipoId);
-    const disponibles = equipos.filter(e => e.productoId === productoId && e.estadoVenta === 'Disponible' && !usados.includes(e.id));
+    const disponibles = equipos.filter(e => e.productoId === venModeloSeleccionado && e.estadoVenta === 'Disponible' && !usados.includes(e.id));
     if (!disponibles.length) {
         $('#venEquipoSel').innerHTML = '<option value="">Sin stock disponible</option>';
         return;
@@ -813,10 +961,10 @@ function cargarEquiposDisponiblesVenta() {
 }
 
 function agregarProductoVenta() {
-    const productoId = parseInt($('#venProductoSel').value);
+    const productoId = venModeloSeleccionado;
     const equipoId = parseInt($('#venEquipoSel').value);
-    const prod = findProducto(productoId);
-    if (!productoId || !equipoId || !prod) { toast('✗ Seleccione un modelo con stock disponible', 'error'); return; }
+    const prod = productoId ? findProducto(productoId) : null;
+    if (!productoId || !equipoId || !prod) { toast('✗ Elija un modelo con stock disponible', 'error'); return; }
 
     ventaCart.push({ productoId, equipoId, precioUnit: prod.precio });
     cargarEquiposDisponiblesVenta();
