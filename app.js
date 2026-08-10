@@ -28,6 +28,11 @@ const findProducto = (id) => productos.find(p => p.id === id);
 const findEquipo = (id) => equipos.find(e => e.id === id);
 const findProveedor = (id) => proveedores.find(p => p.id === id);
 const findCliente = (id) => clientes.find(c => c.id === id);
+const nombreClienteVenta = (v) => {
+    if (!v.clienteId) return 'Cliente varios (sin registrar)';
+    const cli = findCliente(v.clienteId);
+    return cli ? cli.nombre : '(cliente eliminado)';
+};
 const findMarca = (id) => marcas.find(m => m.id === id);
 const nombreProducto = (p) => p ? `${p.marca} ${p.modelo} ${p.almacenamiento} ${p.color}` : '(modelo eliminado)';
 
@@ -345,7 +350,8 @@ function populateSelectProveedores(sel) {
     $(sel).innerHTML = proveedores.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
 }
 function populateSelectClientes(sel) {
-    $(sel).innerHTML = clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+    const opcionVarios = '<option value="">Cliente varios (sin registrar)</option>';
+    $(sel).innerHTML = opcionVarios + clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
 }
 function populateSelectProductos(sel) {
     $(sel).innerHTML = productos.map(p => `<option value="${p.id}">${nombreProducto(p)}</option>`).join('');
@@ -999,12 +1005,13 @@ function renderVentaCart() {
 }
 
 function confirmarVenta() {
-    const clienteId = parseInt($('#venCliente').value);
-    if (!clienteId) { toast('✗ Seleccione un cliente', 'error'); return; }
+    const clienteIdRaw = $('#venCliente').value;
+    const clienteId = clienteIdRaw ? parseInt(clienteIdRaw) : null;
     if (!ventaCart.length) { toast('✗ Agregue al menos un equipo', 'error'); return; }
 
     const formaPago = $('#venFormaPago').value;
     const fechaPagoAcordada = $('#venFechaPagoAcordada').value;
+    if (formaPago === 'Crédito' && !clienteId) { toast('✗ Para venta a crédito debe seleccionar un cliente registrado', 'error'); return; }
     if (formaPago === 'Crédito' && !fechaPagoAcordada) { toast('✗ Ingrese la fecha de pago acordada con el cliente', 'error'); return; }
 
     for (const it of ventaCart) {
@@ -1055,7 +1062,7 @@ function verBoleta(ventaId) {
                 </div>
             </div>
             <div class="detalle-grid">
-                <div><div class="label">Cliente</div><div class="value">${cli ? cli.nombre : '(cliente eliminado)'}</div></div>
+                <div><div class="label">Cliente</div><div class="value">${nombreClienteVenta(v)}</div></div>
                 <div><div class="label">Documento</div><div class="value">${cli ? cli.documento : '—'}</div></div>
                 <div><div class="label">Fecha</div><div class="value">${formatDateLong(v.fecha)}</div></div>
                 <div><div class="label">Forma de pago</div><div class="value">${v.formaPago}</div></div>
@@ -1086,7 +1093,6 @@ function verBoleta(ventaId) {
 function abrirGestionPago(ventaId) {
     const v = ventas.find(x => x.id === ventaId);
     if (!v) return;
-    const cli = findCliente(v.clienteId);
     const total = ventaTotal(v);
     const pagado = ventaMontoPagado(v);
     const saldo = ventaSaldoPendiente(v);
@@ -1103,7 +1109,7 @@ function abrirGestionPago(ventaId) {
     $('#modalGestionPagoTitle').textContent = `Pago — ${v.numBoleta}`;
     $('#gestionPagoContent').innerHTML = `
         <div class="detalle-grid">
-            <div><div class="label">Cliente</div><div class="value">${cli ? cli.nombre : '(cliente eliminado)'}</div></div>
+            <div><div class="label">Cliente</div><div class="value">${nombreClienteVenta(v)}</div></div>
             <div><div class="label">Fecha de venta</div><div class="value">${formatDateLong(v.fecha)}</div></div>
             <div><div class="label">Total</div><div class="value">${formatPEN(total)}</div></div>
             <div><div class="label">Fecha acordada</div><div class="value">${formatDateLong(v.fechaPagoAcordada)}</div></div>
@@ -1161,13 +1167,12 @@ function renderVentas() {
     $('#ventasProductoTop').textContent = topId ? nombreProducto(findProducto(parseInt(topId))) : '—';
 
     $('#ventasBody').innerHTML = lista.map(v => {
-        const cli = findCliente(v.clienteId);
         const { tag, texto } = tagFormaPago(v);
         return `
             <tr>
                 <td><strong>${v.numBoleta}</strong></td>
                 <td>${formatDate(v.fecha)}</td>
-                <td>${cli ? cli.nombre : '(cliente eliminado)'}</td>
+                <td>${nombreClienteVenta(v)}</td>
                 <td>${v.items.length}</td>
                 <td>${formatPEN(ventaTotal(v))}</td>
                 <td class="actions-cell">
@@ -1185,10 +1190,10 @@ function calcularMovimientosCaja(desde, hasta) {
 
     ventas.forEach(v => {
         if (v.formaPago !== 'Crédito') {
-            movimientos.push({ fecha: v.fecha, tipo: 'Entrada', concepto: `Venta ${v.numBoleta} · ${findCliente(v.clienteId)?.nombre || '(cliente eliminado)'}`, monto: ventaTotal(v) });
+            movimientos.push({ fecha: v.fecha, tipo: 'Entrada', concepto: `Venta ${v.numBoleta} · ${nombreClienteVenta(v)}`, monto: ventaTotal(v) });
         } else {
             (v.abonos || []).forEach(a => {
-                movimientos.push({ fecha: a.fecha, tipo: 'Entrada', concepto: `Abono venta ${v.numBoleta} · ${findCliente(v.clienteId)?.nombre || '(cliente eliminado)'}`, monto: a.monto });
+                movimientos.push({ fecha: a.fecha, tipo: 'Entrada', concepto: `Abono venta ${v.numBoleta} · ${nombreClienteVenta(v)}`, monto: a.monto });
             });
         }
     });
@@ -1654,12 +1659,11 @@ function renderCobranzasPorVencerModal() {
         return;
     }
     $('#cobranzasPorVencerList').innerHTML = items.map(({ venta: v, dias }) => {
-        const cli = findCliente(v.clienteId);
         const { tag, texto } = estadoVencimiento(dias);
         return `
             <div class="list-item">
                 <div class="list-item__top">
-                    <div><div class="list-item__name">${cli ? cli.nombre : '(cliente eliminado)'} — ${v.numBoleta}</div><div class="list-item__meta">Vence: ${formatDate(v.fechaPagoAcordada)}</div></div>
+                    <div><div class="list-item__name">${nombreClienteVenta(v)} — ${v.numBoleta}</div><div class="list-item__meta">Vence: ${formatDate(v.fechaPagoAcordada)}</div></div>
                     <span class="tag ${tag}">${texto}</span>
                 </div>
                 <div class="list-item__bottom">
