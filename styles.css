@@ -724,6 +724,16 @@ img {
   box-shadow: 0 0 0 3px hsla(var(--hue), 92%, 50%, .15);
 }
 
+/* Fila de select/input + botón (cliente en Venta, buscador de DNI) */
+.field-with-btn { display: flex; gap: .6rem; }
+.field-with-btn select, .field-with-btn input { flex: 1; }
+.field-with-btn .btn-small-outline { flex-shrink: 0; white-space: nowrap; }
+
+.dni-lookup-msg { font-size: var(--smaller-font-size); }
+.dni-lookup-msg--ok { color: var(--success-color); }
+.dni-lookup-msg--warn { color: hsl(38, 92%, 40%); }
+.dni-lookup-msg--info { color: var(--text-color-light); }
+
 .inline-form { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; }
 .inline-form .form-group { flex: 1; min-width: 140px; }
 

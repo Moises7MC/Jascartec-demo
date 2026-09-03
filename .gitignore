@@ -1,0 +1,6 @@
+# Configuración con token privado (no subir a GitHub)
+config.js
+
+# Caché local de Wrangler (Cloudflare Workers) — no aporta nada al repo
+worker/.wrangler
+worker/node_modules
