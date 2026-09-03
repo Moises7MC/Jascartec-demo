@@ -11,14 +11,41 @@ namespace Jascartec.Infrastructure.Persistence;
 /// </summary>
 public static class DataSeeder
 {
-    public static async Task SeedAsync(JascartecDbContext context)
+    /// <summary>
+    /// Se ejecuta SIEMPRE, incluso en la instalación real del negocio (Seed:CargarDatosDemo
+    /// en false): sin esto, un sistema recién instalado con la base de datos vacía no
+    /// tendría con qué usuario iniciar sesión la primera vez. La contraseña por defecto
+    /// debe cambiarse de inmediato desde "Usuarios" apenas se entra la primera vez.
+    /// </summary>
+    public static async Task SeedEssentialsAsync(JascartecDbContext context)
     {
         if (!await context.Usuarios.AnyAsync())
         {
-            context.Usuarios.AddRange(
-                new Usuario { NombreUsuario = "admin", PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"), Nombre = "Jorge Castillo", Rol = RolUsuario.Administrador, Iniciales = "JC", Activo = true, CreadoEn = DateTimeOffset.UtcNow },
-                new Usuario { NombreUsuario = "vendedor", PasswordHash = BCrypt.Net.BCrypt.HashPassword("vendedor123"), Nombre = "Diana Ríos", Rol = RolUsuario.Vendedor, Iniciales = "DR", Activo = true, CreadoEn = DateTimeOffset.UtcNow }
-            );
+            context.Usuarios.Add(new Usuario
+            {
+                NombreUsuario = "admin",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                Nombre = "Administrador",
+                Rol = RolUsuario.Administrador,
+                Iniciales = "AD",
+                Activo = true,
+                CreadoEn = DateTimeOffset.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Datos de ejemplo (marcas, proveedores, clientes, productos, ingresos, facturas,
+    /// ventas y el usuario "vendedor" de prueba) — SOLO para desarrollo/pruebas. En la
+    /// instalación real del negocio esto se deja apagado para que todo empiece en cero.
+    /// </summary>
+    public static async Task SeedDemoDataAsync(JascartecDbContext context)
+    {
+        if (!await context.Usuarios.AnyAsync(u => u.NombreUsuario == "vendedor"))
+        {
+            context.Usuarios.Add(new Usuario { NombreUsuario = "vendedor", PasswordHash = BCrypt.Net.BCrypt.HashPassword("vendedor123"), Nombre = "Diana Ríos", Rol = RolUsuario.Vendedor, Iniciales = "DR", Activo = true, CreadoEn = DateTimeOffset.UtcNow });
+            await context.SaveChangesAsync();
         }
 
         if (!await context.Marcas.AnyAsync())

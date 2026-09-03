@@ -107,6 +107,11 @@ const tagFormaPago = (v) => {
     return { tag: est.tag, texto: `Debe ${formatPEN(ventaSaldoPendiente(v))}` };
 };
 
+// Una venta anulada conserva su boleta/correlativo, pero no debe contar en
+// ningún total de dinero (dashboard, flujo de caja, gráficos) ni en cobranzas.
+const ventaEstaAnulada = (v) => v.estado === 'Anulada';
+const ventasActivas = () => ventas.filter(v => !ventaEstaAnulada(v));
+
 // ===================== FACTURAS: TOTALES =====================
 const facturaMontoPagado = (f) => f.letras.filter(l => l.pagada).reduce((s, l) => s + l.monto, 0);
 const facturaMontoPendiente = (f) => f.montoTotal - facturaMontoPagado(f);
@@ -412,14 +417,14 @@ function renderDashboard() {
     $('#statEquiposDisponibles').textContent = disponibles;
 
     const inicioMes = today().slice(0, 7);
-    const ventasMes = ventas.filter(v => v.fecha.startsWith(inicioMes)).reduce((s, v) => s + ventaTotal(v), 0);
+    const ventasMes = ventasActivas().filter(v => v.fecha.startsWith(inicioMes)).reduce((s, v) => s + ventaTotal(v), 0);
     $('#statVentasMes').textContent = formatPEN(ventasMes);
-    $('#statBoletas').textContent = ventas.length;
+    $('#statBoletas').textContent = ventas.length; // incluye anuladas: el correlativo emitido cuenta igual
 
     const stockBajoCount = productos.filter(p => stockDisponible(p.id) <= STOCK_MINIMO).length;
     $('#statStockBajo').textContent = stockBajoCount;
 
-    const cobranzas = ventas.filter(v => v.formaPago === 'Crédito' && !ventaEstaPagada(v) && diasParaVencer(v.fechaPagoAcordada) <= DIAS_ALERTA_VENCIMIENTO).length;
+    const cobranzas = ventasActivas().filter(v => v.formaPago === 'Crédito' && !ventaEstaPagada(v) && diasParaVencer(v.fechaPagoAcordada) <= DIAS_ALERTA_VENCIMIENTO).length;
     $('#statCobranzas').textContent = cobranzas;
 }
 
@@ -436,7 +441,7 @@ function initCharts() {
         d.setDate(d.getDate() - i);
         dias.push(d.toISOString().split('T')[0]);
     }
-    const ventasPorDia = dias.map(d => ventas.filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
+    const ventasPorDia = dias.map(d => ventasActivas().filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
 
     chartVentas = new Chart(ctx1, {
         type: 'line',
@@ -448,7 +453,7 @@ function initCharts() {
     });
 
     const porMarca = {};
-    ventas.forEach(v => v.items.forEach(it => {
+    ventasActivas().forEach(v => v.items.forEach(it => {
         porMarca[it.marca] = (porMarca[it.marca] || 0) + it.precioUnit;
     }));
     chartMarcas = new Chart(ctx2, {
@@ -461,7 +466,7 @@ function initCharts() {
     });
 
     const porProducto = {};
-    ventas.forEach(v => v.items.forEach(it => {
+    ventasActivas().forEach(v => v.items.forEach(it => {
         porProducto[it.productoId] = (porProducto[it.productoId] || 0) + 1;
     }));
     const topEntries = Object.entries(porProducto).sort((a, b) => b[1] - a[1]).slice(0, 6);
@@ -489,7 +494,7 @@ function updateCharts() {
     chartVentas.update();
 
     const porMarca = {};
-    ventas.forEach(v => v.items.forEach(it => {
+    ventasActivas().forEach(v => v.items.forEach(it => {
         porMarca[it.marca] = (porMarca[it.marca] || 0) + it.precioUnit;
     }));
     chartMarcas.data.labels = Object.keys(porMarca);
@@ -1074,6 +1079,7 @@ function renderBoleta(v) {
                     <div class="boleta__doc-num">${v.numBoleta}</div>
                 </div>
             </div>
+            ${ventaEstaAnulada(v) ? `<div class="tag tag-red" style="margin-bottom:.85rem;display:inline-block;">✗ BOLETA ANULADA${v.fechaAnulacion ? ` el ${formatDateLong(v.fechaAnulacion)}` : ''}</div>` : ''}
             <div class="detalle-grid">
                 <div><div class="label">Cliente</div><div class="value">${nombreClienteVenta(v)}</div></div>
                 <div><div class="label">Documento</div><div class="value">${v.clienteDocumento || '—'}</div></div>
@@ -1162,41 +1168,70 @@ function renderVentas() {
         $('#ventasBody').innerHTML = '<tr><td colspan="6" class="empty-state">Aún no hay ventas registradas</td></tr>';
         return;
     }
+    // La tabla muestra TODAS las ventas (incluidas las anuladas, para dejar rastro),
+    // pero los totales/estadísticas de dinero solo cuentan las activas.
     const lista = [...ventas].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
-    const totalFacturado = ventas.reduce((s, v) => s + ventaTotal(v), 0);
+    const activas = ventasActivas();
+    const totalFacturado = activas.reduce((s, v) => s + ventaTotal(v), 0);
     $('#ventasTotalFacturado').textContent = formatPEN(totalFacturado);
-    $('#ventasTicketProm').textContent = formatPEN(ventas.length ? totalFacturado / ventas.length : 0);
+    $('#ventasTicketProm').textContent = formatPEN(activas.length ? totalFacturado / activas.length : 0);
 
     const conteoProducto = {};
-    ventas.forEach(v => v.items.forEach(it => {
+    activas.forEach(v => v.items.forEach(it => {
         conteoProducto[it.productoId] = (conteoProducto[it.productoId] || 0) + 1;
     }));
     const topId = Object.entries(conteoProducto).sort((a, b) => b[1] - a[1])[0]?.[0];
     $('#ventasProductoTop').textContent = topId ? nombreProducto(findProducto(parseInt(topId))) : '—';
 
     $('#ventasBody').innerHTML = lista.map(v => {
+        const anulada = ventaEstaAnulada(v);
         const { tag, texto } = tagFormaPago(v);
         return `
-            <tr>
-                <td><strong>${v.numBoleta}</strong></td>
+            <tr style="${anulada ? 'opacity:.55;' : ''}">
+                <td><strong style="${anulada ? 'text-decoration:line-through;' : ''}">${v.numBoleta}</strong></td>
                 <td>${formatDate(v.fecha)}</td>
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.items.length}</td>
                 <td>${formatPEN(ventaTotal(v))}</td>
                 <td class="actions-cell">
                     <button class="btn-small" onclick="verBoleta(${v.id})">Ver</button>
-                    ${v.formaPago === 'Crédito' ? `<button class="btn-small${ventaEstaPagada(v) ? '' : '-danger'}" onclick="abrirGestionPago(${v.id})">${ventaEstaPagada(v) ? 'Pagado' : 'Gestionar pago'}</button>` : `<span class="tag ${tag}">${texto}</span>`}
+                    ${anulada
+                        ? '<span class="tag tag-red">Anulada</span>'
+                        : `
+                            ${v.formaPago === 'Crédito' ? `<button class="btn-small${ventaEstaPagada(v) ? '' : '-danger'}" onclick="abrirGestionPago(${v.id})">${ventaEstaPagada(v) ? 'Pagado' : 'Gestionar pago'}</button>` : `<span class="tag ${tag}">${texto}</span>`}
+                            <button class="btn-small-danger" onclick="anularVenta(${v.id})">Anular</button>
+                        `}
                 </td>
             </tr>
         `;
     }).join('');
 }
 
+async function anularVenta(ventaId) {
+    const v = ventas.find(x => x.id === ventaId);
+    if (!v) return;
+    const ok = await askConfirm({
+        title: `¿Anular la venta ${v.numBoleta}?`,
+        message: 'La boleta queda registrada con estado "Anulada" (conserva su número), y el equipo vendido vuelve a quedar disponible en stock. Esta acción no se puede deshacer.',
+        confirmText: 'Sí, anular'
+    });
+    if (!ok) return;
+
+    try {
+        await api.post(`/ventas/${ventaId}/anular`, {});
+        toast(`Venta ${v.numBoleta} anulada`, 'success');
+        await Promise.all([cargarVentas(), cargarProductos()]);
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
+}
+
 // ===================== FLUJO DE CAJA =====================
 function calcularMovimientosCaja(desde, hasta) {
     const movimientos = [];
 
-    ventas.forEach(v => {
+    ventasActivas().forEach(v => {
         if (v.formaPago !== 'Crédito') {
             movimientos.push({ fecha: v.fecha, tipo: 'Entrada', concepto: `Venta ${v.numBoleta} · ${nombreClienteVenta(v)}`, monto: ventaTotal(v) });
         } else {
@@ -1744,7 +1779,7 @@ function renderStockBajoModal() {
 }
 
 function renderCobranzasPorVencerModal() {
-    const items = ventas
+    const items = ventasActivas()
         .filter(v => v.formaPago === 'Crédito' && !ventaEstaPagada(v))
         .map(v => ({ venta: v, dias: diasParaVencer(v.fechaPagoAcordada) }))
         .filter(x => x.dias <= DIAS_ALERTA_VENCIMIENTO)

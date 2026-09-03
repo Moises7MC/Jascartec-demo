@@ -24,6 +24,9 @@ public class VentaConfiguration : IEntityTypeConfiguration<Venta>
                 v => v == "Crédito" ? FormaPago.Credito : FormaPago.Contado);
         b.Property(x => x.FechaPagoAcordada).HasColumnName("fecha_pago_acordada");
         b.Property(x => x.CreadoEn).HasColumnName("creado_en").IsRequired();
+        b.Property(x => x.Estado).HasColumnName("estado").HasConversion<string>().HasMaxLength(10).IsRequired()
+            .HasDefaultValue(EstadoBoleta.Activa);
+        b.Property(x => x.FechaAnulacion).HasColumnName("fecha_anulacion");
 
         b.HasOne(x => x.Cliente).WithMany(c => c.Ventas).HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.SetNull);
         b.Ignore(x => x.Total);

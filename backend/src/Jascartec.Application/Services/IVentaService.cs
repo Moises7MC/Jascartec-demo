@@ -8,4 +8,5 @@ public interface IVentaService
     Task<VentaDto> ObtenerAsync(int id, CancellationToken ct = default);
     Task<VentaDto> CrearAsync(CrearVentaRequest request, CancellationToken ct = default);
     Task<VentaDto> RegistrarAbonoAsync(int ventaId, RegistrarAbonoRequest request, CancellationToken ct = default);
+    Task<VentaDto> AnularAsync(int id, CancellationToken ct = default);
 }

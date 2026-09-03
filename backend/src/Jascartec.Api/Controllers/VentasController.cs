@@ -25,4 +25,8 @@ public class VentasController(IVentaService ventaService) : ControllerBase
     [HttpPost("{id:int}/abonos")]
     public async Task<ActionResult<VentaDto>> RegistrarAbono(int id, RegistrarAbonoRequest request, CancellationToken ct) =>
         Ok(await ventaService.RegistrarAbonoAsync(id, request, ct));
+
+    [HttpPost("{id:int}/anular")]
+    public async Task<ActionResult<VentaDto>> Anular(int id, CancellationToken ct) =>
+        Ok(await ventaService.AnularAsync(id, ct));
 }

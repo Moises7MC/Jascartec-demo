@@ -77,6 +77,8 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             throw new BusinessRuleException("El monto del abono debe ser mayor a 0.");
 
         var venta = await unitOfWork.Ventas.GetByIdWithDetailsAsync(ventaId, ct) ?? throw new NotFoundException("Venta", ventaId);
+        if (venta.Estado == EstadoBoleta.Anulada)
+            throw new BusinessRuleException("Esta venta está anulada; no se le pueden registrar abonos.");
         if (venta.FormaPago != FormaPago.Credito)
             throw new BusinessRuleException("Solo se pueden registrar abonos en ventas a crédito.");
         if (request.Monto > venta.SaldoPendiente)
@@ -86,6 +88,34 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         await unitOfWork.SaveChangesAsync(ct);
 
         return await ObtenerAsync(ventaId, ct);
+    }
+
+    public async Task<VentaDto> AnularAsync(int id, CancellationToken ct = default)
+    {
+        var venta = await unitOfWork.Ventas.GetByIdWithDetailsAsync(id, ct) ?? throw new NotFoundException("Venta", id);
+        if (venta.Estado == EstadoBoleta.Anulada)
+            throw new BusinessRuleException("Esta venta ya está anulada.");
+        if (venta.Abonos.Count > 0)
+            throw new BusinessRuleException("No se puede anular: esta venta ya tiene abonos registrados. Gestione la devolución del dinero por separado antes de anular.");
+
+        // El correlativo (num_boleta) y el registro de la venta se conservan tal cual,
+        // solo cambia el estado — así queda un rastro auditable. Los equipos vendidos
+        // vuelven a quedar disponibles para venderse de nuevo.
+        foreach (var item in venta.Items)
+        {
+            var equipo = await unitOfWork.Equipos.GetByIdAsync(item.EquipoId, ct);
+            if (equipo is not null)
+            {
+                equipo.EstadoVenta = EstadoVenta.Disponible;
+                unitOfWork.Equipos.Update(equipo);
+            }
+        }
+
+        venta.Estado = EstadoBoleta.Anulada;
+        venta.FechaAnulacion = DateOnly.FromDateTime(DateTime.UtcNow);
+        await unitOfWork.SaveChangesAsync(ct);
+
+        return await ObtenerAsync(id, ct);
     }
 
     private static FormaPago ParsearFormaPago(string formaPago) => formaPago switch
@@ -106,6 +136,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             v.Id, v.NumBoleta, v.Fecha, v.ClienteId,
             v.Cliente?.Nombre ?? "Cliente varios (sin registrar)", v.Cliente?.Documento, v.Cliente?.Direccion,
             v.FormaPago == FormaPago.Credito ? "Crédito" : "Contado", v.FechaPagoAcordada,
-            items, abonos, v.Total, v.MontoPagado, v.SaldoPendiente);
+            items, abonos, v.Total, v.MontoPagado, v.SaldoPendiente,
+            v.Estado.ToString(), v.FechaAnulacion);
     }
 }

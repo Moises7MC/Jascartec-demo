@@ -62,13 +62,20 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// ===================== Datos iniciales (solo en desarrollo) =====================
-if (app.Environment.IsDevelopment())
+// ===================== Base de datos: migrar + sembrar =====================
+// La migración del esquema siempre se aplica (hace falta en cualquier instalación).
+// Los datos de EJEMPLO (marcas/productos/clientes/ventas de prueba) solo se cargan
+// si Seed:CargarDatosDemo está en true — en la instalación real del negocio se deja
+// en false ("appsettings.json") para que el sistema empiece completamente en cero;
+// el usuario esencial ("admin") sí se crea siempre, para poder entrar la primera vez.
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<JascartecDbContext>();
     await db.Database.MigrateAsync();
-    await DataSeeder.SeedAsync(db);
+    await DataSeeder.SeedEssentialsAsync(db);
+
+    if (builder.Configuration.GetValue("Seed:CargarDatosDemo", app.Environment.IsDevelopment()))
+        await DataSeeder.SeedDemoDataAsync(db);
 }
 
 // ===================== Middleware pipeline =====================

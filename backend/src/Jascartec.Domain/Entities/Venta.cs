@@ -11,6 +11,8 @@ public class Venta
     public FormaPago FormaPago { get; set; } = FormaPago.Contado;
     public DateOnly? FechaPagoAcordada { get; set; }
     public DateTimeOffset CreadoEn { get; set; }
+    public EstadoBoleta Estado { get; set; } = EstadoBoleta.Activa;
+    public DateOnly? FechaAnulacion { get; set; }
 
     public Cliente? Cliente { get; set; }
     public ICollection<VentaItem> Items { get; set; } = new List<VentaItem>();
