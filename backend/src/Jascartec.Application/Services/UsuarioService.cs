@@ -42,9 +42,13 @@ public class UsuarioService(IUnitOfWork unitOfWork) : IUsuarioService
         if (existente is not null && existente.Id != id)
             throw new BusinessRuleException($"Ya existe un usuario con el nombre de usuario '{request.Usuario}'.");
 
+        var nuevoRol = ParsearRol(request.Rol);
+        if (usuario.Rol == RolUsuario.Administrador && nuevoRol != RolUsuario.Administrador && await EsUnicoAdministradorAsync(usuario.Id, ct))
+            throw new BusinessRuleException("Debe quedar al menos un Administrador en el sistema.");
+
         usuario.NombreUsuario = request.Usuario;
         usuario.Nombre = request.Nombre;
-        usuario.Rol = ParsearRol(request.Rol);
+        usuario.Rol = nuevoRol;
         usuario.Iniciales = CalcularIniciales(request.Nombre);
         usuario.Activo = request.Activo;
         if (!string.IsNullOrWhiteSpace(request.Password))
@@ -58,8 +62,19 @@ public class UsuarioService(IUnitOfWork unitOfWork) : IUsuarioService
     public async Task EliminarAsync(int id, CancellationToken ct = default)
     {
         var usuario = await unitOfWork.Usuarios.GetByIdAsync(id, ct) ?? throw new NotFoundException("Usuario", id);
+        if (usuario.Rol == RolUsuario.Administrador && await EsUnicoAdministradorAsync(usuario.Id, ct))
+            throw new BusinessRuleException("Debe quedar al menos un Administrador en el sistema.");
+
         unitOfWork.Usuarios.Remove(usuario);
         await unitOfWork.SaveChangesAsync(ct);
+    }
+
+    /// <summary>¿"usuarioId" es el único Administrador que queda registrado?</summary>
+    private async Task<bool> EsUnicoAdministradorAsync(int usuarioId, CancellationToken ct)
+    {
+        var todos = await unitOfWork.Usuarios.GetAllAsync(ct);
+        return todos.Count(u => u.Rol == RolUsuario.Administrador) == 1
+            && todos.Any(u => u.Id == usuarioId && u.Rol == RolUsuario.Administrador);
     }
 
     private static RolUsuario ParsearRol(string rol) =>

@@ -1,6 +1,6 @@
 namespace Jascartec.Application.Dtos;
 
-public record EquipoDto(int Id, int ProductoId, string Producto, string Imei, string EstadoFisico, decimal CostoCompra, string EstadoVenta);
+public record EquipoDto(int Id, int ProductoId, string Producto, string Imei, string EstadoFisico, decimal CostoCompra, DateOnly FechaIngreso, string EstadoVenta);
 
 public record IngresoDto(int Id, DateOnly Fecha, int ProveedorId, string Proveedor, string? NumeroFactura, IReadOnlyList<EquipoDto> Equipos);
 

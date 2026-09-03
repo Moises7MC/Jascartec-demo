@@ -1,6 +1,7 @@
 using Jascartec.Application.Common;
 using Jascartec.Application.Dtos;
 using Jascartec.Domain.Entities;
+using Jascartec.Domain.Enums;
 
 namespace Jascartec.Application.Services;
 
@@ -65,7 +66,21 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
         return await ObtenerAsync(ingreso.Id, ct);
     }
 
+    public async Task EliminarAsync(int id, CancellationToken ct = default)
+    {
+        var ingreso = await unitOfWork.Ingresos.GetByIdWithDetailsAsync(id, ct) ?? throw new NotFoundException("Ingreso", id);
+        if (ingreso.Equipos.Any(e => e.EstadoVenta != EstadoVenta.Disponible))
+            throw new BusinessRuleException("No se puede eliminar: alguno de sus equipos ya fue vendido.");
+
+        // Los equipos de este ingreso representan el inventario que trajo — se eliminan
+        // junto con él (misma regla que ya aplicaba el frontend en memoria).
+        foreach (var equipo in ingreso.Equipos.ToList())
+            unitOfWork.Equipos.Remove(equipo);
+        unitOfWork.Ingresos.Remove(ingreso);
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+
     private static IngresoDto ToDto(Ingreso i) => new(
         i.Id, i.Fecha, i.ProveedorId, i.Proveedor.Nombre, i.NumeroFactura,
-        i.Equipos.Select(e => new EquipoDto(e.Id, e.ProductoId, $"{e.Producto.Marca.Nombre} {e.Producto.Modelo}", e.Imei, e.EstadoFisico, e.CostoCompra, e.EstadoVenta.ToString())).ToList());
+        i.Equipos.Select(e => new EquipoDto(e.Id, e.ProductoId, $"{e.Producto.Marca.Nombre} {e.Producto.Modelo}", e.Imei, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString())).ToList());
 }

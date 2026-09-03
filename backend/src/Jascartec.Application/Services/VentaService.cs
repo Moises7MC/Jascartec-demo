@@ -47,16 +47,20 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         await unitOfWork.Ventas.AddAsync(venta, ct);
         await unitOfWork.SaveChangesAsync(ct); // necesitamos el Id antes de crear los items
 
-        var equiposTomados = new List<int>();
+        var equiposUsadosEnEstaVenta = new HashSet<int>();
         foreach (var item in request.Items)
         {
-            var producto = await unitOfWork.Productos.GetByIdAsync(item.ProductoId, ct)
-                ?? throw new BusinessRuleException($"El producto con id '{item.ProductoId}' no existe.");
+            if (!equiposUsadosEnEstaVenta.Add(item.EquipoId))
+                throw new BusinessRuleException($"El equipo con id '{item.EquipoId}' está repetido en la venta.");
 
-            var equipo = await unitOfWork.Equipos.GetPrimerDisponiblePorProductoAsync(item.ProductoId, equiposTomados, ct)
-                ?? throw new BusinessRuleException($"No hay stock disponible de '{producto.Modelo}'.");
+            var equipo = await unitOfWork.Equipos.GetByIdAsync(item.EquipoId, ct)
+                ?? throw new BusinessRuleException($"El equipo con id '{item.EquipoId}' no existe.");
+            if (equipo.EstadoVenta != EstadoVenta.Disponible)
+                throw new BusinessRuleException($"El equipo con IMEI '{equipo.Imei}' ya no está disponible.");
 
-            equiposTomados.Add(equipo.Id);
+            var producto = await unitOfWork.Productos.GetByIdAsync(equipo.ProductoId, ct)
+                ?? throw new BusinessRuleException($"El producto del equipo '{equipo.Imei}' no existe.");
+
             equipo.EstadoVenta = EstadoVenta.Vendido;
             unitOfWork.Equipos.Update(equipo);
             venta.Items.Add(new VentaItem { VentaId = venta.Id, EquipoId = equipo.Id, PrecioUnit = producto.Precio });
@@ -94,7 +98,8 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
     private static VentaDto ToDto(Venta v)
     {
         var items = v.Items.Select(i => new VentaItemDto(
-            i.EquipoId, $"{i.Equipo.Producto.Marca.Nombre} {i.Equipo.Producto.Modelo}", i.Equipo.Imei, i.PrecioUnit)).ToList();
+            i.EquipoId, i.Equipo.ProductoId, i.Equipo.Producto.Marca.Nombre,
+            $"{i.Equipo.Producto.Marca.Nombre} {i.Equipo.Producto.Modelo}", i.Equipo.Imei, i.PrecioUnit)).ToList();
         var abonos = v.Abonos.OrderBy(a => a.Fecha).Select(a => new AbonoDto(a.Id, a.Fecha, a.Monto)).ToList();
 
         return new VentaDto(

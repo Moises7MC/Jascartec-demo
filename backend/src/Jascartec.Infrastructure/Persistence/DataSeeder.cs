@@ -157,6 +157,26 @@ public static class DataSeeder
             await CrearVentaDemoAsync(context, "B001-00011", new DateOnly(2026, 3, 10), 2, [7], FormaPago.Contado);
             await CrearVentaDemoAsync(context, "B001-00012", new DateOnly(2026, 2, 22), 1, [6], FormaPago.Contado);
         }
+
+        // Las tablas de arriba se sembraron con Id explícito (para que las relaciones entre
+        // ellas coincidan), así que la secuencia IDENTITY de Postgres nunca avanzó — sin este
+        // paso, el primer INSERT nuevo (desde la API) choca con un id ya usado por el seed.
+        await SincronizarSecuenciasIdentityAsync(context);
+    }
+
+    private static async Task SincronizarSecuenciasIdentityAsync(JascartecDbContext context)
+    {
+        // Nombres de tabla fijos y propios (no vienen de entrada de usuario), por eso se arma
+        // el SQL con string.Format en vez de interpolación directa (evita el aviso EF1002 sin
+        // perder la validez de la advertencia para casos con datos externos).
+        string[] tablas = ["marcas", "proveedores", "clientes", "productos", "ingresos", "facturas"];
+        foreach (var tabla in tablas)
+        {
+            var sql = string.Format(
+                "SELECT setval(pg_get_serial_sequence('{0}', 'id'), COALESCE((SELECT MAX(id) FROM {0}), 1), (SELECT MAX(id) FROM {0}) IS NOT NULL);",
+                tabla);
+            await context.Database.ExecuteSqlRawAsync(sql);
+        }
     }
 
     private static async Task CrearVentaDemoAsync(

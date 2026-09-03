@@ -21,4 +21,11 @@ public class IngresosController(IIngresoService ingresoService) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<IngresoDto>> Crear(CrearIngresoRequest request, CancellationToken ct) =>
         Ok(await ingresoService.CrearAsync(request, ct));
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Eliminar(int id, CancellationToken ct)
+    {
+        await ingresoService.EliminarAsync(id, ct);
+        return NoContent();
+    }
 }

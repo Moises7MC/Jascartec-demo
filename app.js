@@ -1,5 +1,9 @@
 /* ============================================================
    app.js — Lógica completa del sistema Jascartec
+   Conectado al backend real (Jascartec.Api + PostgreSQL) a
+   través de apiClient.js. Ya no hay datos de ejemplo en memoria
+   ni respaldo en localStorage: la base de datos del servidor es
+   la única fuente de verdad.
    ============================================================ */
 
 // ===================== HELPERS =====================
@@ -21,19 +25,25 @@ const formatDateLong = (str) => {
     return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 const today = () => new Date().toISOString().split('T')[0];
-const initials = (str) => str.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+// ===================== ESTADO GLOBAL (llenado desde la API) =====================
+let negocio = { razonSocial: '', ruc: '', direccion: '', telefono: '', email: '', web: '' };
+let usuarios = [];
+let marcas = [];
+let proveedores = [];
+let clientes = [];
+let productos = [];
+let ingresos = [];
+let facturas = [];
+let ventas = [];
+let currentUser = null;
 
 // ===================== FINDERS =====================
 const findProducto = (id) => productos.find(p => p.id === id);
-const findEquipo = (id) => equipos.find(e => e.id === id);
 const findProveedor = (id) => proveedores.find(p => p.id === id);
 const findCliente = (id) => clientes.find(c => c.id === id);
-const nombreClienteVenta = (v) => {
-    if (!v.clienteId) return 'Cliente varios (sin registrar)';
-    const cli = findCliente(v.clienteId);
-    return cli ? cli.nombre : '(cliente eliminado)';
-};
 const findMarca = (id) => marcas.find(m => m.id === id);
+const nombreClienteVenta = (v) => v.cliente; // el backend ya arma "Cliente varios (sin registrar)" si aplica
 const nombreProducto = (p) => p ? `${p.marca} ${p.modelo} ${p.almacenamiento} ${p.color}` : '(modelo eliminado)';
 
 // ===================== IMÁGENES DE PRODUCTO =====================
@@ -58,11 +68,12 @@ function placeholderImagenProducto(producto) {
     </svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
-const productoImagenSrc = (p) => (p && p.imagen) ? p.imagen : placeholderImagenProducto(p || { marca: '' });
+const productoImagenSrc = (p) => (p && p.imagenUrl) ? p.imagenUrl : placeholderImagenProducto(p || { marca: '' });
 
 // ===================== STOCK =====================
-const equiposDisponibles = (productoId) => equipos.filter(e => e.productoId === productoId && e.estadoVenta === 'Disponible');
-const stockDisponible = (productoId) => equiposDisponibles(productoId).length;
+// El conteo de disponibles ya lo calcula el backend (producto.stockDisponible);
+// aquí solo lo leemos, para no duplicar esa cuenta en el navegador.
+const stockDisponible = (productoId) => findProducto(productoId)?.stockDisponible ?? 0;
 const estadoStock = (cant) => {
     if (cant === 0) return { tag: 'tag-red', texto: 'Agotado' };
     if (cant <= STOCK_MINIMO) return { tag: 'tag-amber', texto: 'Stock bajo' };
@@ -70,9 +81,11 @@ const estadoStock = (cant) => {
 };
 
 // ===================== VENTAS: TOTALES =====================
-const ventaTotal = (v) => v.items.reduce((s, it) => s + it.precioUnit, 0);
-const ventaMontoPagado = (v) => (v.abonos || []).reduce((s, a) => s + a.monto, 0);
-const ventaSaldoPendiente = (v) => v.formaPago === 'Crédito' ? Math.max(0, ventaTotal(v) - ventaMontoPagado(v)) : 0;
+// El backend ya calcula estos 3 valores (VentaDto.total/montoPagado/saldoPendiente);
+// se mantienen estas funciones solo para no tocar cada sitio que ya las usa.
+const ventaTotal = (v) => v.total;
+const ventaMontoPagado = (v) => v.montoPagado;
+const ventaSaldoPendiente = (v) => v.saldoPendiente;
 const ventaEstaPagada = (v) => v.formaPago !== 'Crédito' || ventaSaldoPendiente(v) <= 0.01;
 
 const DIAS_ALERTA_VENCIMIENTO = 90;
@@ -123,25 +136,48 @@ function resolveConfirm(value) {
 $('#confirmOkBtn').addEventListener('click', () => resolveConfirm(true));
 $('#confirmCancelBtn').addEventListener('click', () => resolveConfirm(false));
 
-// ===================== LOGIN =====================
-$('#formLogin').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const u = $('#loginUser').value.trim();
-    const p = $('#loginPass').value;
-    const user = usuarios.find(usr => usr.usuario === u && usr.password === p);
+// ===================== CARGA DE DATOS DESDE LA API =====================
+async function cargarNegocio() { negocio = await api.get('/negocio'); }
+async function cargarUsuarios() { usuarios = await api.get('/usuarios'); }
+async function cargarMarcas() { marcas = await api.get('/marcas'); }
+async function cargarProveedores() { proveedores = await api.get('/proveedores'); }
+async function cargarClientes() { clientes = await api.get('/clientes'); }
+async function cargarProductos() { productos = await api.get('/productos'); }
+async function cargarIngresos() { ingresos = await api.get('/ingresos'); }
+async function cargarFacturas() { facturas = await api.get('/facturas'); }
+async function cargarVentas() { ventas = await api.get('/ventas'); }
 
+// Proveedores/Ingresos/Facturas/Usuarios son vistas exclusivas de Administrador
+// (mismo criterio que ya aplicaba aplicarPermisos() en la barra lateral) — al
+// Vendedor no le pedimos esos datos, así evitamos un 403 innecesario.
+async function cargarDatosIniciales() {
+    const esAdmin = currentUser.rol === 'Administrador';
+    const tareas = [cargarNegocio(), cargarMarcas(), cargarClientes(), cargarProductos(), cargarVentas()];
+    if (esAdmin) tareas.push(cargarProveedores(), cargarIngresos(), cargarFacturas(), cargarUsuarios());
+    await Promise.all(tareas);
+    if (!esAdmin) { proveedores = []; ingresos = []; facturas = []; usuarios = []; }
+}
+
+// ===================== LOGIN =====================
+$('#formLogin').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const usuario = $('#loginUser').value.trim();
+    const password = $('#loginPass').value;
     const errEl = $('#loginError');
-    if (!user) {
-        errEl.textContent = '✗ Usuario o contraseña incorrectos';
+
+    try {
+        const { token, usuario: usuarioLogueado } = await api.post('/auth/login', { usuario, password });
+        setAuthToken(token);
+        currentUser = usuarioLogueado;
+        errEl.classList.remove('show');
+        await enterApp();
+    } catch (err) {
+        errEl.textContent = `✗ ${err.message}`;
         errEl.classList.add('show');
-        return;
     }
-    errEl.classList.remove('show');
-    currentUser = user;
-    enterApp();
 });
 
-function enterApp() {
+async function enterApp() {
     $('#loginScreen').classList.remove('active');
     $('#appContainer').style.display = 'flex';
 
@@ -154,11 +190,17 @@ function enterApp() {
     $('#userRole').textContent = currentUser.rol;
 
     aplicarPermisos();
-    const cargado = initStorage();
+
+    try {
+        await cargarDatosIniciales();
+    } catch (err) {
+        toast(`✗ No se pudo cargar la información: ${err.message}`, 'error');
+        return;
+    }
+
     renderAll();
     initCharts();
-
-    toast(cargado ? `👋 Bienvenido de vuelta, ${currentUser.nombre}` : `👋 Bienvenido, ${currentUser.nombre}`, 'success');
+    toast(`👋 Bienvenido, ${currentUser.nombre}`, 'success');
 }
 
 async function logout() {
@@ -168,6 +210,7 @@ async function logout() {
         confirmText: 'Sí, cerrar sesión'
     });
     if (!ok) return;
+    clearAuthToken();
     currentUser = null;
     $('#loginScreen').classList.add('active');
     $('#appContainer').style.display = 'none';
@@ -256,8 +299,10 @@ function renderAll() {
     renderUsuarios();
 }
 
-function persistAndRender() {
-    saveToStorage();
+// Se llama después de cada operación que cambia datos en el servidor: la BD real
+// ya quedó actualizada por la propia llamada a la API — acá solo se refresca lo
+// que se ve en pantalla con los datos que ya se volvieron a pedir.
+function refrescarUI() {
     renderAll();
     if (chartVentas) updateCharts();
 }
@@ -287,6 +332,7 @@ function openModal(id) {
     if (id === 'modalVenta') {
         ventaCart = [];
         venModeloSeleccionado = null;
+        ventaEquiposDisponiblesCache = [];
         populateSelectClientes('#venCliente');
         $('#venFormaPago').value = 'Contado';
         $('#venFechaPagoAcordada').value = '';
@@ -362,7 +408,7 @@ function populateSelectProductos(sel) {
 let chartVentas = null, chartMarcas = null, chartTopProductos = null, chartFlujoCajaChart = null;
 
 function renderDashboard() {
-    const disponibles = equipos.filter(e => e.estadoVenta === 'Disponible').length;
+    const disponibles = productos.reduce((s, p) => s + p.stockDisponible, 0);
     $('#statEquiposDisponibles').textContent = disponibles;
 
     const inicioMes = today().slice(0, 7);
@@ -403,10 +449,7 @@ function initCharts() {
 
     const porMarca = {};
     ventas.forEach(v => v.items.forEach(it => {
-        const eq = findEquipo(it.equipoId);
-        const prod = eq ? findProducto(eq.productoId) : null;
-        if (!prod) return;
-        porMarca[prod.marca] = (porMarca[prod.marca] || 0) + it.precioUnit;
+        porMarca[it.marca] = (porMarca[it.marca] || 0) + it.precioUnit;
     }));
     chartMarcas = new Chart(ctx2, {
         type: 'doughnut',
@@ -419,9 +462,7 @@ function initCharts() {
 
     const porProducto = {};
     ventas.forEach(v => v.items.forEach(it => {
-        const eq = findEquipo(it.equipoId);
-        if (!eq) return;
-        porProducto[eq.productoId] = (porProducto[eq.productoId] || 0) + 1;
+        porProducto[it.productoId] = (porProducto[it.productoId] || 0) + 1;
     }));
     const topEntries = Object.entries(porProducto).sort((a, b) => b[1] - a[1]).slice(0, 6);
     chartTopProductos = new Chart(ctx3, {
@@ -449,10 +490,7 @@ function updateCharts() {
 
     const porMarca = {};
     ventas.forEach(v => v.items.forEach(it => {
-        const eq = findEquipo(it.equipoId);
-        const prod = eq ? findProducto(eq.productoId) : null;
-        if (!prod) return;
-        porMarca[prod.marca] = (porMarca[prod.marca] || 0) + it.precioUnit;
+        porMarca[it.marca] = (porMarca[it.marca] || 0) + it.precioUnit;
     }));
     chartMarcas.data.labels = Object.keys(porMarca);
     chartMarcas.data.datasets[0].data = Object.values(porMarca);
@@ -512,7 +550,7 @@ $('#globalSearch').addEventListener('input', (e) => {
 });
 
 // ===================== PRODUCTOS (CRUD) =====================
-// Imagen subida en el modal (base64). null = no se tocó / usar placeholder.
+// Imagen subida en el modal (base64). null = no se tocó / usar la que ya tenía.
 let prodImagenData = null;
 $('#prodImagenInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -528,11 +566,15 @@ $('#prodImagenInput').addEventListener('change', (e) => {
     reader.readAsDataURL(file);
 });
 
-$('#formProducto').addEventListener('submit', (e) => {
+$('#formProducto').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = $('#prodId').value;
-    const data = {
-        marca: $('#prodMarca').value,
+    const marcaNombre = $('#prodMarca').value;
+    const marca = marcas.find(m => m.nombre === marcaNombre);
+    const existente = id ? findProducto(parseInt(id)) : null;
+
+    const payload = {
+        marcaId: marca ? marca.id : null,
         modelo: $('#prodModelo').value.trim(),
         almacenamiento: $('#prodAlmacenamiento').value.trim(),
         ram: $('#prodRam').value.trim(),
@@ -540,26 +582,26 @@ $('#formProducto').addEventListener('submit', (e) => {
         gama: $('#prodGama').value,
         precio: parseFloat($('#prodPrecio').value),
         costoReferencial: parseFloat($('#prodCosto').value),
-        proveedorId: parseInt($('#prodProveedor').value)
+        proveedorId: parseInt($('#prodProveedor').value),
+        // El código solo se genera una vez, al crear — al editar se conserva el que ya tenía.
+        codigo: existente ? existente.codigo : `${marcaNombre.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`,
+        imagenUrl: prodImagenData || (existente ? existente.imagenUrl : null)
     };
 
-    if (id) {
-        const p = findProducto(parseInt(id));
-        Object.assign(p, data);
-        if (prodImagenData) p.imagen = prodImagenData; // solo se reemplaza si subió una foto nueva
-        toast(`✓ Modelo "${nombreProducto(p)}" actualizado`, 'success');
-    } else {
-        const nuevo = {
-            id: nextProductoId++,
-            codigo: `${data.marca.slice(0, 3).toUpperCase()}-${nextProductoId - 1}`,
-            imagen: prodImagenData,
-            ...data
-        };
-        productos.push(nuevo);
-        toast(`✓ Modelo "${nombreProducto(nuevo)}" agregado`, 'success');
+    try {
+        if (id) {
+            await api.put(`/productos/${id}`, payload);
+            toast(`✓ Modelo "${nombreProducto({ ...payload, marca: marcaNombre })}" actualizado`, 'success');
+        } else {
+            await api.post('/productos', payload);
+            toast(`✓ Modelo "${nombreProducto({ ...payload, marca: marcaNombre })}" agregado`, 'success');
+        }
+        closeModal('modalProducto');
+        await cargarProductos();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
     }
-    closeModal('modalProducto');
-    persistAndRender();
 });
 
 function editarProducto(id) {
@@ -586,22 +628,19 @@ function editarProducto(id) {
 async function eliminarProducto(id) {
     const p = findProducto(id);
     if (!p) return;
-    const enUso = equipos.some(e => e.productoId === id);
-    if (enUso) {
-        toast('✗ No se puede eliminar: hay equipos (IMEIs) registrados para este modelo', 'error');
-        return;
-    }
     const ok = await askConfirm({
         title: `¿Eliminar "${nombreProducto(p)}"?`,
         message: 'Este modelo saldrá de tu catálogo. Esta acción no se puede deshacer.',
         confirmText: 'Sí, eliminar'
     });
     if (!ok) return;
-    const idx = productos.findIndex(x => x.id === id);
-    if (idx > -1) {
-        productos.splice(idx, 1);
+    try {
+        await api.del(`/productos/${id}`);
         toast('Modelo eliminado', 'success');
-        persistAndRender();
+        await cargarProductos();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
     }
 }
 
@@ -666,27 +705,25 @@ $('#catFiltroGama').addEventListener('change', renderProductos);
 $('#catOrden').addEventListener('change', renderProductos);
 
 // ===================== MARCAS (CRUD) =====================
-$('#formMarca').addEventListener('submit', (e) => {
+$('#formMarca').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = $('#marId').value;
     const nombre = $('#marNombre').value.trim();
-    const duplicada = marcas.some(m => m.nombre.toLowerCase() === nombre.toLowerCase() && String(m.id) !== id);
-    if (duplicada) {
-        toast(`✗ Ya existe una marca llamada "${nombre}"`, 'error');
-        return;
+
+    try {
+        if (id) {
+            await api.put(`/marcas/${id}`, { nombre });
+            toast(`✓ Marca "${nombre}" actualizada`, 'success');
+        } else {
+            await api.post('/marcas', { nombre });
+            toast(`✓ Marca "${nombre}" agregada`, 'success');
+        }
+        closeModal('modalMarca');
+        await Promise.all([cargarMarcas(), cargarProductos()]); // el nombre de marca puede haber cambiado en los productos
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
     }
-    if (id) {
-        const m = findMarca(parseInt(id));
-        const anterior = m.nombre;
-        m.nombre = nombre;
-        if (anterior !== nombre) productos.forEach(p => { if (p.marca === anterior) p.marca = nombre; });
-        toast(`✓ Marca "${nombre}" actualizada`, 'success');
-    } else {
-        marcas.push({ id: nextMarcaId++, nombre });
-        toast(`✓ Marca "${nombre}" agregada`, 'success');
-    }
-    closeModal('modalMarca');
-    persistAndRender();
 });
 
 function editarMarca(id) {
@@ -701,15 +738,16 @@ function editarMarca(id) {
 async function eliminarMarca(id) {
     const m = findMarca(id);
     if (!m) return;
-    const enUso = productos.filter(p => p.marca === m.nombre).length;
-    if (enUso) {
-        toast(`✗ No se puede eliminar: hay ${enUso} modelo(s) con esta marca`, 'error');
-        return;
-    }
     const ok = await askConfirm({ title: `¿Eliminar la marca "${m.nombre}"?`, message: 'Esta acción no se puede deshacer.', confirmText: 'Sí, eliminar' });
     if (!ok) return;
-    const idx = marcas.findIndex(x => x.id === id);
-    if (idx > -1) { marcas.splice(idx, 1); toast('Marca eliminada', 'success'); persistAndRender(); }
+    try {
+        await api.del(`/marcas/${id}`);
+        toast('Marca eliminada', 'success');
+        await cargarMarcas();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
 }
 
 function renderMarcas() {
@@ -749,8 +787,7 @@ function agregarEquipoIngreso() {
     if (!/^\d{14,16}$/.test(imei)) { toast('✗ Ingrese un IMEI válido (14 a 16 dígitos)', 'error'); return; }
     if (!costoUnit || costoUnit <= 0) { toast('✗ Ingrese un costo válido', 'error'); return; }
 
-    const yaExiste = equipos.some(e => e.imei === imei) || ingresoCart.some(it => it.imei === imei);
-    if (yaExiste) { toast('✗ Ese IMEI ya está registrado', 'error'); return; }
+    if (ingresoCart.some(it => it.imei === imei)) { toast('✗ Ese IMEI ya está en la lista', 'error'); return; }
 
     ingresoCart.push({ productoId, imei, costoUnit });
     $('#ingImei').value = '';
@@ -781,80 +818,58 @@ function renderIngresoCart() {
     $('#ingresoResumen').textContent = `${ingresoCart.length} equipo(s) · Total: ${formatPEN(total)}`;
 }
 
-function confirmarIngreso() {
+async function confirmarIngreso() {
     const proveedorId = parseInt($('#ingProveedor').value);
     const numeroFactura = $('#ingFactura').value.trim() || null;
 
     if (!proveedorId) { toast('✗ Seleccione un proveedor', 'error'); return; }
     if (!ingresoCart.length) { toast('✗ Agregue al menos un equipo', 'error'); return; }
 
-    const nuevoIngreso = { id: nextIngresoId++, fecha: today(), proveedorId, numeroFactura, items: [...ingresoCart] };
-    ingresos.push(nuevoIngreso);
-
-    ingresoCart.forEach(it => {
-        equipos.push({
-            id: nextEquipoId++,
-            productoId: it.productoId,
-            imei: it.imei,
-            estadoFisico: 'Nuevo',
-            costoCompra: it.costoUnit,
-            fechaIngreso: nuevoIngreso.fecha,
-            proveedorId,
-            ingresoId: nuevoIngreso.id,
-            estadoVenta: 'Disponible'
-        });
-    });
-
-    toast(`✓ Ingreso registrado: ${ingresoCart.length} equipo(s)`, 'success');
-    closeModal('modalIngreso');
-    ingresoCart = [];
-    persistAndRender();
+    try {
+        await api.post('/ingresos', { fecha: today(), proveedorId, numeroFactura, items: ingresoCart });
+        toast(`✓ Ingreso registrado: ${ingresoCart.length} equipo(s)`, 'success');
+        closeModal('modalIngreso');
+        ingresoCart = [];
+        await Promise.all([cargarIngresos(), cargarProductos()]);
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
 }
 
 async function eliminarIngreso(id) {
     const ing = ingresos.find(x => x.id === id);
     if (!ing) return;
-    const eqs = equipos.filter(e => e.ingresoId === id);
-    const vendidos = eqs.some(e => e.estadoVenta !== 'Disponible');
-    if (vendidos) {
-        toast('✗ No se puede eliminar: alguno de sus equipos ya fue vendido', 'error');
-        return;
-    }
-    const ok = await askConfirm({ title: '¿Eliminar este ingreso?', message: `Se eliminarán ${eqs.length} equipo(s) asociados. Esta acción no se puede deshacer.`, confirmText: 'Sí, eliminar' });
+    const ok = await askConfirm({ title: '¿Eliminar este ingreso?', message: `Se eliminarán ${ing.equipos.length} equipo(s) asociados. Esta acción no se puede deshacer.`, confirmText: 'Sí, eliminar' });
     if (!ok) return;
 
-    eqs.forEach(e => {
-        const idx = equipos.findIndex(x => x.id === e.id);
-        if (idx > -1) equipos.splice(idx, 1);
-    });
-    const idx = ingresos.findIndex(x => x.id === id);
-    if (idx > -1) ingresos.splice(idx, 1);
-    toast('Ingreso eliminado', 'success');
-    persistAndRender();
+    try {
+        await api.del(`/ingresos/${id}`);
+        toast('Ingreso eliminado', 'success');
+        await Promise.all([cargarIngresos(), cargarProductos()]);
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
 }
 
 function verIngreso(id) {
     const ing = ingresos.find(x => x.id === id);
     if (!ing) return;
-    const prov = findProveedor(ing.proveedorId);
     $('#modalDetalleIngresoTitle').textContent = `Ingreso del ${formatDateLong(ing.fecha)}`;
-    const total = ing.items.reduce((s, it) => s + it.costoUnit, 0);
+    const total = ing.equipos.reduce((s, e) => s + e.costoCompra, 0);
     $('#detalleIngresoContent').innerHTML = `
         <div class="detalle-grid">
-            <div><div class="label">Proveedor</div><div class="value">${prov ? prov.nombre : '—'}</div></div>
+            <div><div class="label">Proveedor</div><div class="value">${ing.proveedor}</div></div>
             <div><div class="label">N° de factura</div><div class="value">${ing.numeroFactura || 'Sin factura'}</div></div>
             <div><div class="label">Total</div><div class="value">${formatPEN(total)}</div></div>
-            <div><div class="label">Equipos</div><div class="value">${ing.items.length}</div></div>
+            <div><div class="label">Equipos</div><div class="value">${ing.equipos.length}</div></div>
         </div>
         <div class="table-wrap" style="margin-top:1rem;">
             <table class="table table--sm">
                 <thead><tr><th>Modelo</th><th>IMEI</th><th>Costo</th><th>Estado</th></tr></thead>
                 <tbody>
-                    ${ing.items.map(it => {
-        const eq = equipos.find(e => e.ingresoId === id && e.imei === it.imei);
-        const estado = eq ? eq.estadoVenta : '—';
-        return `<tr><td>${nombreProducto(findProducto(it.productoId))}</td><td>${it.imei}</td><td>${formatPEN(it.costoUnit)}</td><td>${estado}</td></tr>`;
-    }).join('')}
+                    ${ing.equipos.map(e => `<tr><td>${e.producto}</td><td>${e.imei}</td><td>${formatPEN(e.costoCompra)}</td><td>${e.estadoVenta}</td></tr>`).join('')}
                 </tbody>
             </table>
         </div>
@@ -867,8 +882,7 @@ function renderIngresos() {
     let lista = [...ingresos].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
     if (busqueda) {
         lista = lista.filter(i => {
-            const prov = findProveedor(i.proveedorId);
-            const texto = `${i.numeroFactura || ''} ${prov ? prov.nombre : ''} ${i.items.map(it => it.imei).join(' ')}`.toLowerCase();
+            const texto = `${i.numeroFactura || ''} ${i.proveedor} ${i.equipos.map(e => e.imei).join(' ')}`.toLowerCase();
             return texto.includes(busqueda);
         });
     }
@@ -877,14 +891,13 @@ function renderIngresos() {
         return;
     }
     $('#ingresosBody').innerHTML = lista.map(i => {
-        const prov = findProveedor(i.proveedorId);
-        const total = i.items.reduce((s, it) => s + it.costoUnit, 0);
+        const total = i.equipos.reduce((s, e) => s + e.costoCompra, 0);
         return `
             <tr>
                 <td>${formatDate(i.fecha)}</td>
-                <td>${prov ? prov.nombre : '(proveedor eliminado)'}</td>
+                <td>${i.proveedor}</td>
                 <td>${i.numeroFactura || '—'}</td>
-                <td>${i.items.length}</td>
+                <td>${i.equipos.length}</td>
                 <td>${formatPEN(total)}</td>
                 <td class="actions-cell">
                     <button class="btn-small" onclick="verIngreso(${i.id})">Ver</button>
@@ -899,6 +912,7 @@ $('#ingSearch').addEventListener('input', renderIngresos);
 // ===================== VENTAS =====================
 let ventaCart = [];
 let venModeloSeleccionado = null; // productoId elegido en el selector visual
+let ventaEquiposDisponiblesCache = []; // último resultado de /equipos/disponibles para el modelo elegido
 
 function toggleCampoCredito() {
     const esCredito = $('#venFormaPago').value === 'Crédito';
@@ -956,24 +970,31 @@ function actualizarTriggerModelo() {
     $('#venModeloPrecio').textContent = formatPEN(p.precio);
 }
 
-function cargarEquiposDisponiblesVenta() {
-    if (!venModeloSeleccionado) { $('#venEquipoSel').innerHTML = ''; return; }
+async function cargarEquiposDisponiblesVenta() {
+    if (!venModeloSeleccionado) { $('#venEquipoSel').innerHTML = ''; ventaEquiposDisponiblesCache = []; return; }
     const usados = ventaCart.map(it => it.equipoId);
-    const disponibles = equipos.filter(e => e.productoId === venModeloSeleccionado && e.estadoVenta === 'Disponible' && !usados.includes(e.id));
-    if (!disponibles.length) {
+    try {
+        const disponibles = await api.get(`/equipos/disponibles?productoId=${venModeloSeleccionado}`);
+        ventaEquiposDisponiblesCache = disponibles.filter(e => !usados.includes(e.id));
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+        ventaEquiposDisponiblesCache = [];
+    }
+    if (!ventaEquiposDisponiblesCache.length) {
         $('#venEquipoSel').innerHTML = '<option value="">Sin stock disponible</option>';
         return;
     }
-    $('#venEquipoSel').innerHTML = disponibles.map(e => `<option value="${e.id}">${e.imei} (ingresó ${formatDate(e.fechaIngreso)})</option>`).join('');
+    $('#venEquipoSel').innerHTML = ventaEquiposDisponiblesCache.map(e => `<option value="${e.id}">${e.imei} (ingresó ${formatDate(e.fechaIngreso)})</option>`).join('');
 }
 
 function agregarProductoVenta() {
     const productoId = venModeloSeleccionado;
     const equipoId = parseInt($('#venEquipoSel').value);
+    const equipo = ventaEquiposDisponiblesCache.find(e => e.id === equipoId);
     const prod = productoId ? findProducto(productoId) : null;
-    if (!productoId || !equipoId || !prod) { toast('✗ Elija un modelo con stock disponible', 'error'); return; }
+    if (!productoId || !equipoId || !prod || !equipo) { toast('✗ Elija un modelo con stock disponible', 'error'); return; }
 
-    ventaCart.push({ productoId, equipoId, precioUnit: prod.precio });
+    ventaCart.push({ productoId, equipoId, imei: equipo.imei, precioUnit: prod.precio });
     cargarEquiposDisponiblesVenta();
     renderVentaCart();
 }
@@ -990,60 +1011,51 @@ function renderVentaCart() {
         $('#ventaResumen').textContent = 'Aún no ha agregado equipos';
         return;
     }
-    $('#ventaCartBody').innerHTML = ventaCart.map(it => {
-        const eq = findEquipo(it.equipoId);
-        return `
-            <tr>
-                <td>${nombreProducto(findProducto(it.productoId))}</td>
-                <td>${eq ? eq.imei : '—'}</td>
-                <td>${formatPEN(it.precioUnit)}</td>
-                <td><button class="btn-icon" onclick="quitarProductoVenta(${it.equipoId})"><i class='bx bx-trash'></i></button></td>
-            </tr>
-        `;
-    }).join('');
+    $('#ventaCartBody').innerHTML = ventaCart.map(it => `
+        <tr>
+            <td>${nombreProducto(findProducto(it.productoId))}</td>
+            <td>${it.imei}</td>
+            <td>${formatPEN(it.precioUnit)}</td>
+            <td><button class="btn-icon" onclick="quitarProductoVenta(${it.equipoId})"><i class='bx bx-trash'></i></button></td>
+        </tr>
+    `).join('');
     const total = ventaCart.reduce((s, it) => s + it.precioUnit, 0);
     $('#ventaResumen').textContent = `${ventaCart.length} equipo(s) · Total: ${formatPEN(total)}`;
 }
 
-function confirmarVenta() {
+async function confirmarVenta() {
     const clienteIdRaw = $('#venCliente').value;
     const clienteId = clienteIdRaw ? parseInt(clienteIdRaw) : null;
     if (!ventaCart.length) { toast('✗ Agregue al menos un equipo', 'error'); return; }
 
     const formaPago = $('#venFormaPago').value;
-    const fechaPagoAcordada = $('#venFechaPagoAcordada').value;
-    if (formaPago === 'Crédito' && !clienteId) { toast('✗ Para venta a crédito debe seleccionar un cliente registrado', 'error'); return; }
-    if (formaPago === 'Crédito' && !fechaPagoAcordada) { toast('✗ Ingrese la fecha de pago acordada con el cliente', 'error'); return; }
+    const fechaPagoAcordada = $('#venFechaPagoAcordada').value || null;
 
-    for (const it of ventaCart) {
-        const eq = findEquipo(it.equipoId);
-        if (!eq || eq.estadoVenta !== 'Disponible') { toast('✗ Uno de los equipos ya no está disponible. Vuelva a intentar.', 'error'); return; }
+    try {
+        const nuevaVenta = await api.post('/ventas', {
+            clienteId,
+            items: ventaCart.map(it => ({ equipoId: it.equipoId })),
+            formaPago,
+            fechaPagoAcordada
+        });
+
+        toast(`✓ Venta ${nuevaVenta.numBoleta} registrada: ${formatPEN(ventaTotal(nuevaVenta))}`, 'success');
+        closeModal('modalVenta');
+        ventaCart = [];
+        await Promise.all([cargarVentas(), cargarProductos()]);
+        refrescarUI();
+        setTimeout(() => renderBoleta(nuevaVenta), 400);
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
     }
-
-    const nuevaVenta = {
-        id: nextVentaId++,
-        numBoleta: `B001-${String(nextBoleta++).padStart(5, '0')}`,
-        fecha: today(),
-        clienteId,
-        items: ventaCart.map(it => ({ equipoId: it.equipoId, precioUnit: it.precioUnit })),
-        formaPago,
-        fechaPagoAcordada: formaPago === 'Crédito' ? fechaPagoAcordada : null,
-        abonos: []
-    };
-    ventas.push(nuevaVenta);
-    ventaCart.forEach(it => { findEquipo(it.equipoId).estadoVenta = 'Vendido'; });
-
-    toast(`✓ Venta ${nuevaVenta.numBoleta} registrada: ${formatPEN(ventaTotal(nuevaVenta))}`, 'success');
-    closeModal('modalVenta');
-    ventaCart = [];
-    persistAndRender();
-    setTimeout(() => verBoleta(nuevaVenta.id), 400);
 }
 
 function verBoleta(ventaId) {
     const v = ventas.find(x => x.id === ventaId);
-    if (!v) return;
-    const cli = findCliente(v.clienteId);
+    if (v) renderBoleta(v);
+}
+
+function renderBoleta(v) {
     const total = ventaTotal(v);
     const igv = total - total / 1.18;
 
@@ -1064,8 +1076,8 @@ function verBoleta(ventaId) {
             </div>
             <div class="detalle-grid">
                 <div><div class="label">Cliente</div><div class="value">${nombreClienteVenta(v)}</div></div>
-                <div><div class="label">Documento</div><div class="value">${cli ? cli.documento : '—'}</div></div>
-                <div><div class="label">Dirección</div><div class="value">${cli ? cli.direccion : '—'}</div></div>
+                <div><div class="label">Documento</div><div class="value">${v.clienteDocumento || '—'}</div></div>
+                <div><div class="label">Dirección</div><div class="value">${v.clienteDireccion || '—'}</div></div>
                 <div><div class="label">Fecha</div><div class="value">${formatDateLong(v.fecha)}</div></div>
                 <div><div class="label">Forma de pago</div><div class="value">${v.formaPago}</div></div>
             </div>
@@ -1073,11 +1085,7 @@ function verBoleta(ventaId) {
                 <table class="table table--sm">
                     <thead><tr><th>Equipo</th><th>IMEI</th><th>Precio</th></tr></thead>
                     <tbody>
-                        ${v.items.map(it => {
-        const eq = findEquipo(it.equipoId);
-        const prod = eq ? findProducto(eq.productoId) : null;
-        return `<tr><td>${nombreProducto(prod)}</td><td>${eq ? eq.imei : '—'}</td><td>${formatPEN(it.precioUnit)}</td></tr>`;
-    }).join('')}
+                        ${v.items.map(it => `<tr><td>${it.producto}</td><td>${it.imei}</td><td>${formatPEN(it.precioUnit)}</td></tr>`).join('')}
                     </tbody>
                 </table>
             </div>
@@ -1132,21 +1140,21 @@ function abrirGestionPago(ventaId) {
     $('#modalGestionPago').classList.add('active');
 }
 
-function registrarAbono(ventaId) {
-    const v = ventas.find(x => x.id === ventaId);
-    if (!v) return;
+async function registrarAbono(ventaId) {
     const monto = parseFloat($('#abonoMonto').value);
     const fecha = $('#abonoFecha').value;
     if (!monto || monto <= 0) { toast('✗ Ingrese un monto válido', 'error'); return; }
     if (!fecha) { toast('✗ Ingrese la fecha del abono', 'error'); return; }
-    const saldo = ventaSaldoPendiente(v);
-    if (monto > saldo + 0.01) { toast(`✗ El monto no puede superar el saldo pendiente (${formatPEN(saldo)})`, 'error'); return; }
 
-    v.abonos = v.abonos || [];
-    v.abonos.push({ fecha, monto });
-    toast(`✓ Abono de ${formatPEN(monto)} registrado`, 'success');
-    persistAndRender();
-    abrirGestionPago(ventaId);
+    try {
+        await api.post(`/ventas/${ventaId}/abonos`, { fecha, monto });
+        toast(`✓ Abono de ${formatPEN(monto)} registrado`, 'success');
+        await cargarVentas();
+        refrescarUI();
+        abrirGestionPago(ventaId);
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
 }
 
 function renderVentas() {
@@ -1161,9 +1169,7 @@ function renderVentas() {
 
     const conteoProducto = {};
     ventas.forEach(v => v.items.forEach(it => {
-        const eq = findEquipo(it.equipoId);
-        if (!eq) return;
-        conteoProducto[eq.productoId] = (conteoProducto[eq.productoId] || 0) + 1;
+        conteoProducto[it.productoId] = (conteoProducto[it.productoId] || 0) + 1;
     }));
     const topId = Object.entries(conteoProducto).sort((a, b) => b[1] - a[1])[0]?.[0];
     $('#ventasProductoTop').textContent = topId ? nombreProducto(findProducto(parseInt(topId))) : '—';
@@ -1203,16 +1209,15 @@ function calcularMovimientosCaja(desde, hasta) {
     const numerosConFactura = new Set(facturas.map(f => f.numeroFactura));
     ingresos.forEach(i => {
         if (!i.numeroFactura || !numerosConFactura.has(i.numeroFactura)) {
-            const total = i.items.reduce((s, it) => s + it.costoUnit, 0);
-            movimientos.push({ fecha: i.fecha, tipo: 'Salida', concepto: `Compra · ${findProveedor(i.proveedorId)?.nombre || '(proveedor eliminado)'} (${i.items.length} equipos)`, monto: total });
+            const total = i.equipos.reduce((s, e) => s + e.costoCompra, 0);
+            movimientos.push({ fecha: i.fecha, tipo: 'Salida', concepto: `Compra · ${i.proveedor} (${i.equipos.length} equipos)`, monto: total });
         }
     });
 
     facturas.forEach(f => {
-        const prov = findProveedor(f.proveedorId);
         f.letras.forEach(l => {
             if (l.pagada) {
-                movimientos.push({ fecha: l.fechaPago || l.fechaVencimiento, tipo: 'Salida', concepto: `Letra ${l.numero}/${f.letras.length} · Factura ${f.numeroFactura} · ${prov ? prov.nombre : '—'}`, monto: l.monto });
+                movimientos.push({ fecha: l.fechaPago || l.fechaVencimiento, tipo: 'Salida', concepto: `Letra ${l.numero}/${f.letras.length} · Factura ${f.numeroFactura} · ${f.proveedor}`, monto: l.monto });
             }
         });
     });
@@ -1291,7 +1296,7 @@ function renderChartFlujoCaja() {
 }
 
 // ===================== PROVEEDORES =====================
-$('#formProveedor').addEventListener('submit', (e) => {
+$('#formProveedor').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = $('#provId').value;
     const data = {
@@ -1301,16 +1306,20 @@ $('#formProveedor').addEventListener('submit', (e) => {
         email: $('#provEmail').value.trim(),
         direccion: $('#provDireccion').value.trim()
     };
-    if (id) {
-        const p = proveedores.find(x => x.id === parseInt(id));
-        Object.assign(p, data);
-        toast(`✓ Proveedor "${p.nombre}" actualizado`, 'success');
-    } else {
-        proveedores.push({ id: nextProveedorId++, ...data });
-        toast(`✓ Proveedor "${data.nombre}" agregado`, 'success');
+    try {
+        if (id) {
+            await api.put(`/proveedores/${id}`, data);
+            toast(`✓ Proveedor "${data.nombre}" actualizado`, 'success');
+        } else {
+            await api.post('/proveedores', data);
+            toast(`✓ Proveedor "${data.nombre}" agregado`, 'success');
+        }
+        closeModal('modalProveedor');
+        await cargarProveedores();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
     }
-    closeModal('modalProveedor');
-    persistAndRender();
 });
 
 function editarProveedor(id) {
@@ -1329,12 +1338,16 @@ function editarProveedor(id) {
 async function eliminarProveedor(id) {
     const p = findProveedor(id);
     if (!p) return;
-    const enUso = equipos.some(e => e.proveedorId === id) || facturas.some(f => f.proveedorId === id);
-    if (enUso) { toast('✗ No se puede eliminar: tiene ingresos o facturas registradas', 'error'); return; }
     const ok = await askConfirm({ title: `¿Eliminar a "${p.nombre}"?`, message: 'Esta acción no se puede deshacer.', confirmText: 'Sí, eliminar' });
     if (!ok) return;
-    const idx = proveedores.findIndex(x => x.id === id);
-    if (idx > -1) { proveedores.splice(idx, 1); toast('Proveedor eliminado', 'success'); persistAndRender(); }
+    try {
+        await api.del(`/proveedores/${id}`);
+        toast('Proveedor eliminado', 'success');
+        await cargarProveedores();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
 }
 
 function renderProveedores() {
@@ -1420,7 +1433,7 @@ function abrirNuevoClienteDesdeVenta() {
 }
 
 // ===================== CLIENTES =====================
-$('#formCliente').addEventListener('submit', (e) => {
+$('#formCliente').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = $('#cliId').value;
     const data = {
@@ -1432,25 +1445,28 @@ $('#formCliente').addEventListener('submit', (e) => {
         email: $('#cliEmail').value.trim(),
         direccion: $('#cliDireccion').value.trim()
     };
-    let clienteGuardadoId;
-    if (id) {
-        const c = findCliente(parseInt(id));
-        Object.assign(c, data);
-        clienteGuardadoId = c.id;
-        toast(`✓ Cliente "${c.nombre}" actualizado`, 'success');
-    } else {
-        clienteGuardadoId = nextClienteId++;
-        clientes.push({ id: clienteGuardadoId, ...data });
-        toast(`✓ Cliente "${data.nombre}" agregado`, 'success');
-    }
-    closeModal('modalCliente');
-    persistAndRender();
 
-    if (clienteVinoDesdeVenta) {
-        // Volvemos a la venta con el cliente recién creado ya seleccionado, sin perder el carrito.
-        populateSelectClientes('#venCliente');
-        $('#venCliente').value = clienteGuardadoId;
-        clienteVinoDesdeVenta = false;
+    try {
+        let clienteGuardado;
+        if (id) {
+            clienteGuardado = await api.put(`/clientes/${id}`, data);
+            toast(`✓ Cliente "${clienteGuardado.nombre}" actualizado`, 'success');
+        } else {
+            clienteGuardado = await api.post('/clientes', data);
+            toast(`✓ Cliente "${clienteGuardado.nombre}" agregado`, 'success');
+        }
+        closeModal('modalCliente');
+        await cargarClientes();
+        refrescarUI();
+
+        if (clienteVinoDesdeVenta) {
+            // Volvemos a la venta con el cliente recién creado ya seleccionado, sin perder el carrito.
+            populateSelectClientes('#venCliente');
+            $('#venCliente').value = clienteGuardado.id;
+            clienteVinoDesdeVenta = false;
+        }
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
     }
 });
 
@@ -1472,12 +1488,16 @@ function editarCliente(id) {
 async function eliminarCliente(id) {
     const c = findCliente(id);
     if (!c) return;
-    const enUso = ventas.some(v => v.clienteId === id);
-    if (enUso) { toast('✗ No se puede eliminar: tiene ventas registradas', 'error'); return; }
     const ok = await askConfirm({ title: `¿Eliminar a "${c.nombre}"?`, message: 'Esta acción no se puede deshacer.', confirmText: 'Sí, eliminar' });
     if (!ok) return;
-    const idx = clientes.findIndex(x => x.id === id);
-    if (idx > -1) { clientes.splice(idx, 1); toast('Cliente eliminado', 'success'); persistAndRender(); }
+    try {
+        await api.del(`/clientes/${id}`);
+        toast('Cliente eliminado', 'success');
+        await cargarClientes();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
 }
 
 function renderClientes() {
@@ -1528,7 +1548,7 @@ function generarLetras() {
     $('#facLetrasWrapper').style.display = '';
 }
 
-function guardarFactura() {
+async function guardarFactura() {
     const numeroFactura = $('#facNumero').value.trim();
     const proveedorId = parseInt($('#facProveedor').value);
     const fecha = $('#facFecha').value;
@@ -1544,22 +1564,26 @@ function guardarFactura() {
     filas.forEach((fila, idx) => {
         const monto = parseFloat(fila.querySelector('[data-letra-monto]').value) || 0;
         const fechaVencimiento = fila.querySelector('[data-letra-fecha]').value;
-        letras.push({ numero: idx + 1, monto, fechaVencimiento, pagada: false, fechaPago: null });
+        letras.push({ numero: idx + 1, monto, fechaVencimiento });
         sumaLetras += monto;
     });
 
     if (Math.abs(sumaLetras - montoTotal) > 0.5) { toast(`✗ La suma de las letras (${formatPEN(sumaLetras)}) no coincide con el monto total (${formatPEN(montoTotal)})`, 'error'); return; }
 
-    facturas.push({ id: nextFacturaId++, numeroFactura, proveedorId, fecha, montoTotal, letras });
-    toast(`✓ Factura ${numeroFactura} registrada`, 'success');
-    closeModal('modalFactura');
-    persistAndRender();
+    try {
+        await api.post('/facturas', { numeroFactura, proveedorId, fecha, montoTotal, letras });
+        toast(`✓ Factura ${numeroFactura} registrada`, 'success');
+        closeModal('modalFactura');
+        await cargarFacturas();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
 }
 
 function verFactura(id) {
     const f = facturas.find(x => x.id === id);
     if (!f) return;
-    const prov = findProveedor(f.proveedorId);
     const isAdmin = currentUser?.rol === 'Administrador';
 
     $('#modalDetalleFacturaTitle').textContent = `Factura ${f.numeroFactura}`;
@@ -1571,7 +1595,7 @@ function verFactura(id) {
                 <div class="list-item__top">
                     <div>
                         <div class="list-item__name">Letra ${l.numero} de ${f.letras.length}</div>
-                        <div class="list-item__meta">Vence: ${formatDate(l.fechaVencimiento)} · ${prov ? prov.nombre : '—'}</div>
+                        <div class="list-item__meta">Vence: ${formatDate(l.fechaVencimiento)} · ${f.proveedor}</div>
                     </div>
                     <span class="tag ${tag}">${texto}</span>
                 </div>
@@ -1585,16 +1609,16 @@ function verFactura(id) {
     openModal('modalDetalleFactura');
 }
 
-function toggleLetraPagada(facturaId, numeroLetra) {
-    const f = facturas.find(x => x.id === facturaId);
-    if (!f) return;
-    const letra = f.letras.find(l => l.numero === numeroLetra);
-    if (!letra) return;
-    letra.pagada = !letra.pagada;
-    letra.fechaPago = letra.pagada ? today() : null;
-    toast(letra.pagada ? '✓ Letra marcada como pagada' : 'Letra marcada como pendiente', 'success');
-    persistAndRender();
-    verFactura(facturaId);
+async function toggleLetraPagada(facturaId, numeroLetra) {
+    try {
+        await api.patch(`/facturas/${facturaId}/letras/${numeroLetra}/toggle-pagada`);
+        await cargarFacturas();
+        toast('✓ Letra actualizada', 'success');
+        refrescarUI();
+        verFactura(facturaId);
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
 }
 
 function renderFacturas() {
@@ -1603,7 +1627,6 @@ function renderFacturas() {
         return;
     }
     $('#facturasGrid').innerHTML = facturas.map(f => {
-        const prov = findProveedor(f.proveedorId);
         const pagado = facturaMontoPagado(f);
         const pendiente = facturaMontoPendiente(f);
         const proxima = facturaProximaLetra(f);
@@ -1616,7 +1639,7 @@ function renderFacturas() {
             <div class="entity-card">
                 <div class="entity-card__icon"><i class='bx bx-file'></i></div>
                 <div class="entity-name">${f.numeroFactura}</div>
-                <div class="entity-info">🏢 ${prov ? prov.nombre : '—'}</div>
+                <div class="entity-info">🏢 ${f.proveedor}</div>
                 <div class="entity-info">📅 ${formatDateLong(f.fecha)}</div>
                 <div class="entity-info">💰 Total: ${formatPEN(f.montoTotal)}</div>
                 <div class="entity-info">Pagado: ${formatPEN(pagado)} · Pendiente: ${formatPEN(pendiente)}</div>
@@ -1628,7 +1651,7 @@ function renderFacturas() {
 }
 
 // ===================== USUARIOS =====================
-$('#formUsuario').addEventListener('submit', (e) => {
+$('#formUsuario').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = $('#usrId').value;
     const nombre = $('#usrNombre').value.trim();
@@ -1636,25 +1659,21 @@ $('#formUsuario').addEventListener('submit', (e) => {
     const rol = $('#usrRol').value;
     const password = $('#usrPassword').value;
 
-    const duplicado = usuarios.some(u => u.usuario.toLowerCase() === usuario.toLowerCase() && String(u.id) !== id);
-    if (duplicado) { toast(`✗ Ya existe un usuario con el nombre "${usuario}"`, 'error'); return; }
-
-    if (id) {
-        const u = usuarios.find(x => x.id === parseInt(id));
-        if (u.rol === 'Administrador' && rol !== 'Administrador' && usuarios.filter(x => x.rol === 'Administrador').length === 1) {
-            toast('✗ Debe quedar al menos un Administrador en el sistema', 'error');
-            return;
+    try {
+        if (id) {
+            await api.put(`/usuarios/${id}`, { usuario, password: password || null, nombre, rol, activo: true });
+            toast(`✓ Usuario "${nombre}" actualizado`, 'success');
+        } else {
+            if (!password) { toast('✗ Ingrese una contraseña para el nuevo usuario', 'error'); return; }
+            await api.post('/usuarios', { usuario, password, nombre, rol });
+            toast(`✓ Usuario "${nombre}" agregado`, 'success');
         }
-        u.nombre = nombre; u.usuario = usuario; u.rol = rol; u.iniciales = initials(nombre);
-        if (password) u.password = password;
-        toast(`✓ Usuario "${nombre}" actualizado`, 'success');
-    } else {
-        if (!password) { toast('✗ Ingrese una contraseña para el nuevo usuario', 'error'); return; }
-        usuarios.push({ id: nextUsuarioId++, usuario, password, nombre, rol, iniciales: initials(nombre) });
-        toast(`✓ Usuario "${nombre}" agregado`, 'success');
+        closeModal('modalUsuario');
+        await cargarUsuarios();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
     }
-    closeModal('modalUsuario');
-    persistAndRender();
 });
 
 function editarUsuario(id) {
@@ -1673,11 +1692,16 @@ async function eliminarUsuario(id) {
     const u = usuarios.find(x => x.id === id);
     if (!u) return;
     if (currentUser && u.id === currentUser.id) { toast('✗ No puede eliminar su propio usuario mientras tiene la sesión abierta', 'error'); return; }
-    if (u.rol === 'Administrador' && usuarios.filter(x => x.rol === 'Administrador').length === 1) { toast('✗ Debe quedar al menos un Administrador en el sistema', 'error'); return; }
     const ok = await askConfirm({ title: `¿Eliminar a "${u.nombre}"?`, message: 'Este usuario ya no podrá iniciar sesión. Esta acción no se puede deshacer.', confirmText: 'Sí, eliminar' });
     if (!ok) return;
-    const idx = usuarios.findIndex(x => x.id === id);
-    if (idx > -1) { usuarios.splice(idx, 1); toast('Usuario eliminado', 'success'); persistAndRender(); }
+    try {
+        await api.del(`/usuarios/${id}`);
+        toast('Usuario eliminado', 'success');
+        await cargarUsuarios();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
 }
 
 function renderUsuarios() {
@@ -1749,18 +1773,26 @@ function renderCobranzasPorVencerModal() {
 }
 
 // ===================== CONFIGURACIÓN =====================
-$('#importFile').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-        await importBackup(file);
-        toast('✓ Respaldo importado correctamente', 'success');
-        persistAndRender();
-    } catch (err) {
-        toast(`✗ ${err.message}`, 'error');
-    }
-    e.target.value = '';
-});
+// La base de datos real vive en el servidor; esto solo descarga una foto de
+// referencia de lo que hay cargado en este momento (ya no existe "importar",
+// restaurar un archivo hacia la base de datos es una operación aparte).
+function exportBackup() {
+    const data = {
+        negocio, productos, proveedores, clientes, ingresos, ventas, marcas, facturas, usuarios,
+        version: 'jascartec_v2_api',
+        exportadoEn: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fecha = new Date().toISOString().split('T')[0];
+    a.href = url;
+    a.download = `jascartec_respaldo_${fecha}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
 
 // ===================== INICIALIZACIÓN =====================
 document.addEventListener('DOMContentLoaded', () => {

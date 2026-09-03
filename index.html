@@ -505,13 +505,9 @@
                     </div>
                     <div class="card">
                         <div class="card__header"><h3>Respaldo de datos</h3></div>
-                        <p class="muted">Exporta toda la información del sistema a un archivo, o restaura un respaldo anterior.</p>
+                        <p class="muted">Descarga una foto actual de toda la información del sistema (la base de datos real vive en el servidor; esto es solo una copia de referencia).</p>
                         <div class="config-actions">
                             <button class="btn btn--primary" onclick="exportBackup()"><i class='bx bx-download'></i> Exportar respaldo</button>
-                            <label class="btn btn--outline">
-                                <i class='bx bx-upload'></i> Importar respaldo
-                                <input type="file" id="importFile" accept=".json" style="display:none;">
-                            </label>
                         </div>
                     </div>
                 </section>
@@ -1013,10 +1009,9 @@
     <!-- ===================== TOAST ===================== -->
     <div class="toast" id="toast"></div>
 
-    <script src="data.js"></script>
-    <script src="storage.js"></script>
     <script src="config.js"></script>
     <script src="dniApi.js"></script>
+    <script src="apiClient.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

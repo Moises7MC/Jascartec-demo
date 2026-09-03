@@ -20,25 +20,21 @@ public class FacturaService(IUnitOfWork unitOfWork) : IFacturaService
 
     public async Task<FacturaDto> CrearAsync(CrearFacturaRequest request, CancellationToken ct = default)
     {
-        if (request.NumeroLetras < 1)
+        if (request.Letras.Count == 0)
             throw new BusinessRuleException("La factura debe tener al menos 1 letra.");
         if (await unitOfWork.Proveedores.GetByIdAsync(request.ProveedorId, ct) is null)
             throw new BusinessRuleException($"El proveedor con id '{request.ProveedorId}' no existe.");
 
-        // Mismo reparto que hoy hace generarLetras() en app.js: monto total dividido
-        // en partes iguales, una letra por mes a partir de la fecha de la factura.
-        var montoPorLetra = Math.Round(request.MontoTotal / request.NumeroLetras, 2);
-        var letras = new List<Letra>();
-        for (short i = 1; i <= request.NumeroLetras; i++)
-        {
-            letras.Add(new Letra
-            {
-                Numero = i,
-                Monto = montoPorLetra,
-                FechaVencimiento = request.Fecha.AddMonths(i),
-                Pagada = false
-            });
-        }
+        // Las letras ya vienen calculadas/editadas desde el frontend (generarLetras() en
+        // app.js); acá solo validamos que la suma cuadre con el total, igual que ya
+        // valida guardarFactura() del lado del cliente.
+        var sumaLetras = request.Letras.Sum(l => l.Monto);
+        if (Math.Abs(sumaLetras - request.MontoTotal) > 0.5m)
+            throw new BusinessRuleException($"La suma de las letras ({sumaLetras:F2}) no coincide con el monto total ({request.MontoTotal:F2}).");
+
+        var letras = request.Letras
+            .Select(l => new Letra { Numero = (short)l.Numero, Monto = l.Monto, FechaVencimiento = l.FechaVencimiento, Pagada = false })
+            .ToList();
 
         var factura = new Factura
         {

@@ -11,11 +11,6 @@ public class EquipoRepository(JascartecDbContext context) : Repository<Equipo>(c
     public Task<bool> ExisteImeiAsync(string imei, CancellationToken ct = default) =>
         Set.AnyAsync(e => e.Imei == imei, ct);
 
-    public Task<Equipo?> GetPrimerDisponiblePorProductoAsync(int productoId, IReadOnlyCollection<int> excluidos, CancellationToken ct = default) =>
-        Set.Where(e => e.ProductoId == productoId && e.EstadoVenta == EstadoVenta.Disponible && !excluidos.Contains(e.Id))
-            .OrderBy(e => e.Id)
-            .FirstOrDefaultAsync(ct);
-
     public async Task<IReadOnlyList<Equipo>> GetDisponiblesPorProductoAsync(int productoId, CancellationToken ct = default) =>
         await Set.Where(e => e.ProductoId == productoId && e.EstadoVenta == EstadoVenta.Disponible).ToListAsync(ct);
 
