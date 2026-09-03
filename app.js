@@ -303,6 +303,7 @@ function openModal(id) {
         $('#modalClienteTitle').textContent = 'Nuevo Cliente';
         $('#cliId').value = '';
         $('#formCliente').reset();
+        actualizarUiDniLookup();
     }
     if (id === 'modalProveedor') {
         $('#modalProveedorTitle').textContent = 'Nuevo Proveedor';
@@ -850,10 +851,10 @@ function verIngreso(id) {
                 <thead><tr><th>Modelo</th><th>IMEI</th><th>Costo</th><th>Estado</th></tr></thead>
                 <tbody>
                     ${ing.items.map(it => {
-                        const eq = equipos.find(e => e.ingresoId === id && e.imei === it.imei);
-                        const estado = eq ? eq.estadoVenta : '—';
-                        return `<tr><td>${nombreProducto(findProducto(it.productoId))}</td><td>${it.imei}</td><td>${formatPEN(it.costoUnit)}</td><td>${estado}</td></tr>`;
-                    }).join('')}
+        const eq = equipos.find(e => e.ingresoId === id && e.imei === it.imei);
+        const estado = eq ? eq.estadoVenta : '—';
+        return `<tr><td>${nombreProducto(findProducto(it.productoId))}</td><td>${it.imei}</td><td>${formatPEN(it.costoUnit)}</td><td>${estado}</td></tr>`;
+    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -1064,6 +1065,7 @@ function verBoleta(ventaId) {
             <div class="detalle-grid">
                 <div><div class="label">Cliente</div><div class="value">${nombreClienteVenta(v)}</div></div>
                 <div><div class="label">Documento</div><div class="value">${cli ? cli.documento : '—'}</div></div>
+                <div><div class="label">Dirección</div><div class="value">${cli ? cli.direccion : '—'}</div></div>
                 <div><div class="label">Fecha</div><div class="value">${formatDateLong(v.fecha)}</div></div>
                 <div><div class="label">Forma de pago</div><div class="value">${v.formaPago}</div></div>
             </div>
@@ -1072,10 +1074,10 @@ function verBoleta(ventaId) {
                     <thead><tr><th>Equipo</th><th>IMEI</th><th>Precio</th></tr></thead>
                     <tbody>
                         ${v.items.map(it => {
-                            const eq = findEquipo(it.equipoId);
-                            const prod = eq ? findProducto(eq.productoId) : null;
-                            return `<tr><td>${nombreProducto(prod)}</td><td>${eq ? eq.imei : '—'}</td><td>${formatPEN(it.precioUnit)}</td></tr>`;
-                        }).join('')}
+        const eq = findEquipo(it.equipoId);
+        const prod = eq ? findProducto(eq.productoId) : null;
+        return `<tr><td>${nombreProducto(prod)}</td><td>${eq ? eq.imei : '—'}</td><td>${formatPEN(it.precioUnit)}</td></tr>`;
+    }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -1356,6 +1358,67 @@ function renderProveedores() {
     `).join('');
 }
 
+// ===================== CLIENTES · Búsqueda por DNI (RENIEC) =====================
+// Muestra/oculta el buscador según si ya se agotaron las consultas gratis del mes.
+function actualizarUiDniLookup() {
+    const wrap = $('#cliDniLookupWrap');
+    if (!wrap) return;
+    const msgEl = $('#cliDniMsg');
+    if (dniApiDisponible()) {
+        $('#cliDniBuscar').style.display = '';
+        $('#cliDniBuscarBtn').style.display = '';
+        $('#cliDniBuscar').value = '';
+        msgEl.textContent = '';
+        msgEl.className = 'dni-lookup-msg';
+    } else {
+        $('#cliDniBuscar').style.display = 'none';
+        $('#cliDniBuscarBtn').style.display = 'none';
+        msgEl.textContent = 'Se alcanzó el límite de consultas gratuitas a RENIEC de este mes. Complete los datos del cliente manualmente — se reactivará solo el próximo mes.';
+        msgEl.className = 'dni-lookup-msg dni-lookup-msg--info';
+    }
+}
+
+async function buscarClienteDNI() {
+    const numero = $('#cliDniBuscar').value.trim();
+    const msgEl = $('#cliDniMsg');
+    if (!/^\d{8}$/.test(numero)) {
+        msgEl.textContent = 'Ingrese los 8 dígitos del DNI';
+        msgEl.className = 'dni-lookup-msg dni-lookup-msg--warn';
+        return;
+    }
+    msgEl.textContent = 'Buscando...';
+    msgEl.className = 'dni-lookup-msg';
+
+    const res = await consultarDNI(numero);
+    if (res.ok) {
+        $('#cliNombre').value = res.data.nombreCompleto;
+        $('#cliDocumento').value = res.data.dni;
+        $('#cliTipo').value = 'Particular';
+        msgEl.textContent = '✓ Datos encontrados en RENIEC. Complete el resto (teléfono, email, dirección) manualmente.';
+        msgEl.className = 'dni-lookup-msg dni-lookup-msg--ok';
+    } else if (res.motivo === 'agotado') {
+        actualizarUiDniLookup(); // ya se marcó agotado dentro de consultarDNI: ocultamos el buscador
+    } else if (res.motivo === 'no_encontrado') {
+        msgEl.textContent = 'No se encontró ese DNI. Complete los datos manualmente.';
+        msgEl.className = 'dni-lookup-msg dni-lookup-msg--warn';
+    } else {
+        msgEl.textContent = 'No se pudo consultar en este momento. Complete los datos manualmente.';
+        msgEl.className = 'dni-lookup-msg dni-lookup-msg--warn';
+    }
+}
+
+// Búsqueda automática al completar los 8 dígitos (sin esperar clic en "Buscar")
+$('#cliDniBuscar').addEventListener('input', (e) => {
+    if (/^\d{8}$/.test(e.target.value.trim())) buscarClienteDNI();
+});
+
+// ===================== CLIENTES · Alta rápida desde Registrar Venta =====================
+let clienteVinoDesdeVenta = false;
+function abrirNuevoClienteDesdeVenta() {
+    clienteVinoDesdeVenta = true;
+    openModal('modalCliente');
+}
+
 // ===================== CLIENTES =====================
 $('#formCliente').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1369,16 +1432,26 @@ $('#formCliente').addEventListener('submit', (e) => {
         email: $('#cliEmail').value.trim(),
         direccion: $('#cliDireccion').value.trim()
     };
+    let clienteGuardadoId;
     if (id) {
         const c = findCliente(parseInt(id));
         Object.assign(c, data);
+        clienteGuardadoId = c.id;
         toast(`✓ Cliente "${c.nombre}" actualizado`, 'success');
     } else {
-        clientes.push({ id: nextClienteId++, ...data });
+        clienteGuardadoId = nextClienteId++;
+        clientes.push({ id: clienteGuardadoId, ...data });
         toast(`✓ Cliente "${data.nombre}" agregado`, 'success');
     }
     closeModal('modalCliente');
     persistAndRender();
+
+    if (clienteVinoDesdeVenta) {
+        // Volvemos a la venta con el cliente recién creado ya seleccionado, sin perder el carrito.
+        populateSelectClientes('#venCliente');
+        $('#venCliente').value = clienteGuardadoId;
+        clienteVinoDesdeVenta = false;
+    }
 });
 
 function editarCliente(id) {

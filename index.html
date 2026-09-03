@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jascartec — Sistema de Ventas de Celulares</title>
 
-    <link rel="shortcut icon" href="logo_jascartec.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="fotoIcono.ico" type="image/x-icon">
 
     <!--=============== BOXICONS ===============-->
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
@@ -668,7 +668,12 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Cliente</label>
-                        <select id="venCliente"></select>
+                        <div class="field-with-btn">
+                            <select id="venCliente"></select>
+                            <button type="button" class="btn-small-outline" onclick="abrirNuevoClienteDesdeVenta()" title="Registrar un cliente nuevo sin salir de la venta">
+                                <i class='bx bx-user-plus'></i> Nuevo
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Forma de pago</label>
@@ -761,6 +766,16 @@
             </div>
             <form class="modal__body" id="formCliente">
                 <input type="hidden" id="cliId">
+                <div class="form-group" id="cliDniLookupWrap">
+                    <label>Buscar por DNI (RENIEC)</label>
+                    <div class="field-with-btn">
+                        <input type="text" id="cliDniBuscar" placeholder="8 dígitos" maxlength="8" inputmode="numeric">
+                        <button type="button" class="btn-small-outline" id="cliDniBuscarBtn" onclick="buscarClienteDNI()">
+                            <i class='bx bx-search'></i> Buscar
+                        </button>
+                    </div>
+                    <div class="dni-lookup-msg" id="cliDniMsg"></div>
+                </div>
                 <div class="form-group">
                     <label>Nombre / Razón social</label>
                     <input type="text" id="cliNombre" required>
@@ -1000,6 +1015,8 @@
 
     <script src="data.js"></script>
     <script src="storage.js"></script>
+    <script src="config.js"></script>
+    <script src="dniApi.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
