@@ -1440,7 +1440,7 @@ $('#formCliente').addEventListener('submit', async (e) => {
         nombre: $('#cliNombre').value.trim(),
         documento: $('#cliDocumento').value.trim(),
         tipo: $('#cliTipo').value,
-        contacto: $('#cliContacto').value.trim(),
+        contacto: $('#cliNombre').value.trim(), // ya no se pide aparte; se usa el mismo nombre del cliente
         telefono: $('#cliTelefono').value.trim(),
         email: $('#cliEmail').value.trim(),
         direccion: $('#cliDireccion').value.trim()
@@ -1479,7 +1479,6 @@ function editarCliente(id) {
     $('#cliNombre').value = c.nombre;
     $('#cliDocumento').value = c.documento;
     $('#cliTipo').value = c.tipo;
-    $('#cliContacto').value = c.contacto;
     $('#cliTelefono').value = c.telefono;
     $('#cliEmail').value = c.email;
     $('#cliDireccion').value = c.direccion;
