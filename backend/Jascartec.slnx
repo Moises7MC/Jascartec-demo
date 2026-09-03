@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Jascartec.Api/Jascartec.Api.csproj" />
+    <Project Path="src/Jascartec.Application/Jascartec.Application.csproj" />
+    <Project Path="src/Jascartec.Domain/Jascartec.Domain.csproj" />
+    <Project Path="src/Jascartec.Infrastructure/Jascartec.Infrastructure.csproj" />
+  </Folder>
+</Solution>

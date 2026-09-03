@@ -1,0 +1,23 @@
+using Jascartec.Application.Abstractions;
+
+namespace Jascartec.Application.Common;
+
+/// <summary>
+/// Agrupa todos los repositorios y expone SaveChangesAsync, para que las operaciones
+/// que tocan varias tablas (ej. registrar una venta) se confirmen todas juntas o ninguna.
+/// </summary>
+public interface IUnitOfWork
+{
+    INegocioRepository Negocios { get; }
+    IUsuarioRepository Usuarios { get; }
+    IMarcaRepository Marcas { get; }
+    IProveedorRepository Proveedores { get; }
+    IClienteRepository Clientes { get; }
+    IProductoRepository Productos { get; }
+    IIngresoRepository Ingresos { get; }
+    IEquipoRepository Equipos { get; }
+    IFacturaRepository Facturas { get; }
+    IVentaRepository Ventas { get; }
+
+    Task<int> SaveChangesAsync(CancellationToken ct = default);
+}

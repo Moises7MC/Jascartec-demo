@@ -1,0 +1,106 @@
+using Jascartec.Application.Common;
+using Jascartec.Application.Dtos;
+using Jascartec.Domain.Entities;
+using Jascartec.Domain.Enums;
+
+namespace Jascartec.Application.Services;
+
+public class VentaService(IUnitOfWork unitOfWork) : IVentaService
+{
+    public async Task<IReadOnlyList<VentaDto>> ListarAsync(CancellationToken ct = default)
+    {
+        var ventas = await unitOfWork.Ventas.GetAllWithDetailsAsync(ct);
+        return ventas.Select(ToDto).ToList();
+    }
+
+    public async Task<VentaDto> ObtenerAsync(int id, CancellationToken ct = default)
+    {
+        var venta = await unitOfWork.Ventas.GetByIdWithDetailsAsync(id, ct) ?? throw new NotFoundException("Venta", id);
+        return ToDto(venta);
+    }
+
+    public async Task<VentaDto> CrearAsync(CrearVentaRequest request, CancellationToken ct = default)
+    {
+        if (request.Items.Count == 0)
+            throw new BusinessRuleException("La venta debe tener al menos un equipo.");
+
+        var formaPago = ParsearFormaPago(request.FormaPago);
+
+        // Mismas reglas de negocio que hoy valida confirmarVenta() en app.js.
+        if (formaPago == FormaPago.Credito && request.ClienteId is null)
+            throw new BusinessRuleException("Para venta a crédito debe seleccionar un cliente registrado.");
+        if (formaPago == FormaPago.Credito && request.FechaPagoAcordada is null)
+            throw new BusinessRuleException("Ingrese la fecha de pago acordada con el cliente.");
+
+        if (request.ClienteId is not null && await unitOfWork.Clientes.GetByIdAsync(request.ClienteId.Value, ct) is null)
+            throw new BusinessRuleException($"El cliente con id '{request.ClienteId}' no existe.");
+
+        var venta = new Venta
+        {
+            NumBoleta = await unitOfWork.Ventas.GenerarSiguienteNumBoletaAsync(ct),
+            Fecha = DateOnly.FromDateTime(DateTime.UtcNow),
+            ClienteId = request.ClienteId,
+            FormaPago = formaPago,
+            FechaPagoAcordada = formaPago == FormaPago.Credito ? request.FechaPagoAcordada : null,
+            CreadoEn = DateTimeOffset.UtcNow
+        };
+        await unitOfWork.Ventas.AddAsync(venta, ct);
+        await unitOfWork.SaveChangesAsync(ct); // necesitamos el Id antes de crear los items
+
+        var equiposTomados = new List<int>();
+        foreach (var item in request.Items)
+        {
+            var producto = await unitOfWork.Productos.GetByIdAsync(item.ProductoId, ct)
+                ?? throw new BusinessRuleException($"El producto con id '{item.ProductoId}' no existe.");
+
+            var equipo = await unitOfWork.Equipos.GetPrimerDisponiblePorProductoAsync(item.ProductoId, equiposTomados, ct)
+                ?? throw new BusinessRuleException($"No hay stock disponible de '{producto.Modelo}'.");
+
+            equiposTomados.Add(equipo.Id);
+            equipo.EstadoVenta = EstadoVenta.Vendido;
+            unitOfWork.Equipos.Update(equipo);
+            venta.Items.Add(new VentaItem { VentaId = venta.Id, EquipoId = equipo.Id, PrecioUnit = producto.Precio });
+
+            await unitOfWork.SaveChangesAsync(ct); // aplica el UNIQUE(equipo_id) antes de seguir con el siguiente item
+        }
+
+        return await ObtenerAsync(venta.Id, ct);
+    }
+
+    public async Task<VentaDto> RegistrarAbonoAsync(int ventaId, RegistrarAbonoRequest request, CancellationToken ct = default)
+    {
+        if (request.Monto <= 0)
+            throw new BusinessRuleException("El monto del abono debe ser mayor a 0.");
+
+        var venta = await unitOfWork.Ventas.GetByIdWithDetailsAsync(ventaId, ct) ?? throw new NotFoundException("Venta", ventaId);
+        if (venta.FormaPago != FormaPago.Credito)
+            throw new BusinessRuleException("Solo se pueden registrar abonos en ventas a crédito.");
+        if (request.Monto > venta.SaldoPendiente)
+            throw new BusinessRuleException($"El abono ({request.Monto:F2}) supera el saldo pendiente ({venta.SaldoPendiente:F2}).");
+
+        venta.Abonos.Add(new Abono { VentaId = ventaId, Fecha = request.Fecha, Monto = request.Monto });
+        await unitOfWork.SaveChangesAsync(ct);
+
+        return await ObtenerAsync(ventaId, ct);
+    }
+
+    private static FormaPago ParsearFormaPago(string formaPago) => formaPago switch
+    {
+        "Contado" => FormaPago.Contado,
+        "Crédito" or "Credito" => FormaPago.Credito,
+        _ => throw new BusinessRuleException($"Forma de pago inválida: '{formaPago}'. Use 'Contado' o 'Crédito'.")
+    };
+
+    private static VentaDto ToDto(Venta v)
+    {
+        var items = v.Items.Select(i => new VentaItemDto(
+            i.EquipoId, $"{i.Equipo.Producto.Marca.Nombre} {i.Equipo.Producto.Modelo}", i.Equipo.Imei, i.PrecioUnit)).ToList();
+        var abonos = v.Abonos.OrderBy(a => a.Fecha).Select(a => new AbonoDto(a.Id, a.Fecha, a.Monto)).ToList();
+
+        return new VentaDto(
+            v.Id, v.NumBoleta, v.Fecha, v.ClienteId,
+            v.Cliente?.Nombre ?? "Cliente varios (sin registrar)", v.Cliente?.Documento, v.Cliente?.Direccion,
+            v.FormaPago == FormaPago.Credito ? "Crédito" : "Contado", v.FechaPagoAcordada,
+            items, abonos, v.Total, v.MontoPagado, v.SaldoPendiente);
+    }
+}

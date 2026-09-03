@@ -1,0 +1,6 @@
+# .NET
+backend/**/bin/
+backend/**/obj/
+
+# Configuración local con contraseña real (no subir a GitHub)
+backend/src/Jascartec.Api/appsettings.Development.json
