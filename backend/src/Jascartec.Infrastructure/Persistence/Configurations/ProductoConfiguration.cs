@@ -11,11 +11,14 @@ public class ProductoConfiguration : IEntityTypeConfiguration<Producto>
         b.ToTable("productos");
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
+        b.Property(x => x.CategoriaId).HasColumnName("categoria_id").IsRequired();
         b.Property(x => x.MarcaId).HasColumnName("marca_id").IsRequired();
         b.Property(x => x.Modelo).HasColumnName("modelo").IsRequired();
         b.Property(x => x.Almacenamiento).HasColumnName("almacenamiento").HasMaxLength(20);
         b.Property(x => x.Ram).HasColumnName("ram").HasMaxLength(20);
         b.Property(x => x.Color).HasColumnName("color");
+        b.Property(x => x.Descripcion).HasColumnName("descripcion");
+        b.Property(x => x.StockCantidad).HasColumnName("stock_cantidad").IsRequired().HasDefaultValue(0);
         b.Property(x => x.Precio).HasColumnName("precio").HasColumnType("numeric(10,2)").IsRequired();
         b.Property(x => x.CostoReferencial).HasColumnName("costo_referencial").HasColumnType("numeric(10,2)");
         b.Property(x => x.ProveedorId).HasColumnName("proveedor_id");
@@ -25,6 +28,7 @@ public class ProductoConfiguration : IEntityTypeConfiguration<Producto>
         b.Property(x => x.ImagenUrl).HasColumnName("imagen_url");
         b.Property(x => x.CreadoEn).HasColumnName("creado_en").IsRequired();
 
+        b.HasOne(x => x.Categoria).WithMany(c => c.Productos).HasForeignKey(x => x.CategoriaId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Marca).WithMany(m => m.Productos).HasForeignKey(x => x.MarcaId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Proveedor).WithMany(p => p.Productos).HasForeignKey(x => x.ProveedorId).OnDelete(DeleteBehavior.SetNull);
     }

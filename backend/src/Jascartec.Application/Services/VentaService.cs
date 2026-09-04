@@ -22,7 +22,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
     public async Task<VentaDto> CrearAsync(CrearVentaRequest request, CancellationToken ct = default)
     {
         if (request.Items.Count == 0)
-            throw new BusinessRuleException("La venta debe tener al menos un equipo.");
+            throw new BusinessRuleException("La venta debe tener al menos un producto.");
 
         var formaPago = ParsearFormaPago(request.FormaPago);
 
@@ -34,26 +34,53 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             throw new BusinessRuleException($"El cliente con id '{request.ClienteId}' no existe.");
 
         // Resolvemos equipos/productos primero: necesitamos el Total de la venta antes de poder
-        // calcular el recargo y el cronograma de cuotas.
+        // calcular el recargo y el cronograma de cuotas. Cada línea es o un equipo puntual con IMEI
+        // (categoría con serie individual) o N unidades de un producto por cantidad.
         var equiposUsadosEnEstaVenta = new HashSet<int>();
-        var itemsResueltos = new List<(Equipo Equipo, Producto Producto)>();
+        var cantidadReservadaPorProducto = new Dictionary<int, int>();
+        var itemsResueltos = new List<(Equipo? Equipo, Producto Producto, int Cantidad)>();
         foreach (var item in request.Items)
         {
-            if (!equiposUsadosEnEstaVenta.Add(item.EquipoId))
-                throw new BusinessRuleException($"El equipo con id '{item.EquipoId}' está repetido en la venta.");
+            if (item.EquipoId is not null)
+            {
+                if (!equiposUsadosEnEstaVenta.Add(item.EquipoId.Value))
+                    throw new BusinessRuleException($"El equipo con id '{item.EquipoId}' está repetido en la venta.");
 
-            var equipo = await unitOfWork.Equipos.GetByIdAsync(item.EquipoId, ct)
-                ?? throw new BusinessRuleException($"El equipo con id '{item.EquipoId}' no existe.");
-            if (equipo.EstadoVenta != EstadoVenta.Disponible)
-                throw new BusinessRuleException($"El equipo con IMEI '{equipo.Imei}' ya no está disponible.");
+                var equipo = await unitOfWork.Equipos.GetByIdAsync(item.EquipoId.Value, ct)
+                    ?? throw new BusinessRuleException($"El equipo con id '{item.EquipoId}' no existe.");
+                if (equipo.EstadoVenta != EstadoVenta.Disponible)
+                    throw new BusinessRuleException($"El equipo con IMEI '{equipo.Imei}' ya no está disponible.");
 
-            var producto = await unitOfWork.Productos.GetByIdAsync(equipo.ProductoId, ct)
-                ?? throw new BusinessRuleException($"El producto del equipo '{equipo.Imei}' no existe.");
+                var producto = await unitOfWork.Productos.GetByIdAsync(equipo.ProductoId, ct)
+                    ?? throw new BusinessRuleException($"El producto del equipo '{equipo.Imei}' no existe.");
 
-            itemsResueltos.Add((equipo, producto));
+                itemsResueltos.Add((equipo, producto, 1));
+            }
+            else if (item.ProductoId is not null)
+            {
+                if (item.Cantidad is null || item.Cantidad < 1)
+                    throw new BusinessRuleException("Indique una cantidad válida (mayor a 0) para el producto.");
+
+                var producto = await unitOfWork.Productos.GetByIdWithDetailsAsync(item.ProductoId.Value, ct)
+                    ?? throw new BusinessRuleException($"El producto con id '{item.ProductoId}' no existe.");
+                if (producto.Categoria.RequiereImei)
+                    throw new BusinessRuleException($"El producto '{producto.Modelo}' se controla por IMEI: elija un equipo puntual, no una cantidad.");
+
+                cantidadReservadaPorProducto.TryGetValue(producto.Id, out var yaReservado);
+                var reservadoTotal = yaReservado + item.Cantidad.Value;
+                if (reservadoTotal > producto.StockCantidad)
+                    throw new BusinessRuleException($"Stock insuficiente de '{producto.Modelo}': disponible {producto.StockCantidad}, solicitado {reservadoTotal}.");
+                cantidadReservadaPorProducto[producto.Id] = reservadoTotal;
+
+                itemsResueltos.Add((null, producto, item.Cantidad.Value));
+            }
+            else
+            {
+                throw new BusinessRuleException("Cada línea de la venta debe traer un equipo (IMEI) o un producto con cantidad.");
+            }
         }
 
-        var total = itemsResueltos.Sum(x => x.Producto.Precio);
+        var total = itemsResueltos.Sum(x => x.Producto.Precio * x.Cantidad);
         var fecha = RelojNegocio.HoyPeru();
 
         decimal? montoInicial = null;
@@ -101,11 +128,20 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         await unitOfWork.Ventas.AddAsync(venta, ct);
         await unitOfWork.SaveChangesAsync(ct); // necesitamos el Id antes de crear los items
 
-        foreach (var (equipo, producto) in itemsResueltos)
+        foreach (var (equipo, producto, cantidad) in itemsResueltos)
         {
-            equipo.EstadoVenta = EstadoVenta.Vendido;
-            unitOfWork.Equipos.Update(equipo);
-            venta.Items.Add(new VentaItem { VentaId = venta.Id, EquipoId = equipo.Id, PrecioUnit = producto.Precio });
+            if (equipo is not null)
+            {
+                equipo.EstadoVenta = EstadoVenta.Vendido;
+                unitOfWork.Equipos.Update(equipo);
+                venta.Items.Add(new VentaItem { VentaId = venta.Id, EquipoId = equipo.Id, Cantidad = 1, PrecioUnit = producto.Precio });
+            }
+            else
+            {
+                producto.StockCantidad -= cantidad;
+                unitOfWork.Productos.Update(producto);
+                venta.Items.Add(new VentaItem { VentaId = venta.Id, ProductoId = producto.Id, Cantidad = cantidad, PrecioUnit = producto.Precio });
+            }
 
             await unitOfWork.SaveChangesAsync(ct); // aplica el UNIQUE(equipo_id) antes de seguir con el siguiente item
         }
@@ -148,15 +184,28 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             throw new BusinessRuleException("No se puede anular: esta venta ya tiene abonos registrados. Gestione la devolución del dinero por separado antes de anular.");
 
         // El correlativo (num_boleta) y el registro de la venta se conservan tal cual,
-        // solo cambia el estado — así queda un rastro auditable. Los equipos vendidos
-        // vuelven a quedar disponibles para venderse de nuevo.
+        // solo cambia el estado — así queda un rastro auditable. El stock vendido vuelve a
+        // quedar disponible: el equipo puntual pasa a Disponible, o se devuelve la cantidad
+        // al contador del producto, según el tipo de línea.
         foreach (var item in venta.Items)
         {
-            var equipo = await unitOfWork.Equipos.GetByIdAsync(item.EquipoId, ct);
-            if (equipo is not null)
+            if (item.EquipoId is not null)
             {
-                equipo.EstadoVenta = EstadoVenta.Disponible;
-                unitOfWork.Equipos.Update(equipo);
+                var equipo = await unitOfWork.Equipos.GetByIdAsync(item.EquipoId.Value, ct);
+                if (equipo is not null)
+                {
+                    equipo.EstadoVenta = EstadoVenta.Disponible;
+                    unitOfWork.Equipos.Update(equipo);
+                }
+            }
+            else if (item.ProductoId is not null)
+            {
+                var producto = await unitOfWork.Productos.GetByIdAsync(item.ProductoId.Value, ct);
+                if (producto is not null)
+                {
+                    producto.StockCantidad += item.Cantidad;
+                    unitOfWork.Productos.Update(producto);
+                }
             }
 
             // Libera el equipo_id (índice único filtrado por activo=true) para que pueda
@@ -262,9 +311,14 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
 
     private static VentaDto ToDto(Venta v)
     {
-        var items = v.Items.Select(i => new VentaItemDto(
-            i.EquipoId, i.Equipo.ProductoId, i.Equipo.Producto.Marca.Nombre,
-            $"{i.Equipo.Producto.Marca.Nombre} {i.Equipo.Producto.Modelo}", i.Equipo.Imei, i.PrecioUnit)).ToList();
+        var items = v.Items.Select(i =>
+        {
+            // Línea de equipo puntual (IMEI) o línea por cantidad — cada una trae su propio producto.
+            var producto = i.Equipo?.Producto ?? i.Producto!;
+            return new VentaItemDto(
+                i.EquipoId, producto.Id, producto.Marca.Nombre,
+                $"{producto.Marca.Nombre} {producto.Modelo}", i.Equipo?.Imei, i.Cantidad, i.PrecioUnit);
+        }).ToList();
         var abonos = v.Abonos.OrderBy(a => a.Fecha).Select(a => new AbonoDto(a.Id, a.Fecha, a.Monto)).ToList();
         var cuotas = ConstruirCronograma(v);
 

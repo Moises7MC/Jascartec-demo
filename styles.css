@@ -741,6 +741,16 @@ img {
   box-shadow: 0 0 0 3px hsla(var(--hue), 92%, 50%, .15);
 }
 
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  font-size: var(--small-font-size);
+  color: var(--title-color);
+  cursor: pointer;
+}
+.form-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--first-color); flex-shrink: 0; }
+
 /* Fila de select/input + botón (cliente en Venta, buscador de DNI) */
 .field-with-btn { display: flex; gap: .6rem; }
 .field-with-btn select, .field-with-btn input { flex: 1; }

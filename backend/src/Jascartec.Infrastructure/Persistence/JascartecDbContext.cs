@@ -8,10 +8,12 @@ public class JascartecDbContext(DbContextOptions<JascartecDbContext> options) : 
     public DbSet<Negocio> Negocios => Set<Negocio>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Marca> Marcas => Set<Marca>();
+    public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Proveedor> Proveedores => Set<Proveedor>();
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<Producto> Productos => Set<Producto>();
     public DbSet<Ingreso> Ingresos => Set<Ingreso>();
+    public DbSet<IngresoItem> IngresoItems => Set<IngresoItem>();
     public DbSet<Equipo> Equipos => Set<Equipo>();
     public DbSet<Factura> Facturas => Set<Factura>();
     public DbSet<Letra> Letras => Set<Letra>();

@@ -33,6 +33,17 @@ public static class DataSeeder
             });
             await context.SaveChangesAsync();
         }
+
+        // "Celulares" siempre existe (con IMEI, como el negocio ya lo maneja); el administrador
+        // crea el resto de categorías (accesorios, impresoras, etc.) desde el sistema.
+        if (!await context.Categorias.AnyAsync())
+        {
+            context.Categorias.Add(new Categoria { Id = 1, Nombre = "Celulares", RequiereImei = true });
+            await context.SaveChangesAsync();
+            // Se sembró con Id explícito: sin esto, la primera categoría creada desde la API
+            // (con Id autogenerado) chocaría con el 1 que ya usó este seed.
+            await SincronizarSecuenciaIdentityAsync(context, "categorias");
+        }
     }
 
     /// <summary>
@@ -84,14 +95,14 @@ public static class DataSeeder
         if (!await context.Productos.AnyAsync())
         {
             context.Productos.AddRange(
-                new Producto { Id = 1, MarcaId = 1, Modelo = "Galaxy A54", Almacenamiento = "128GB", Ram = "8GB", Color = "Negro", Precio = 1099.00m, CostoReferencial = 850.00m, ProveedorId = 1, Codigo = "SAM-A54-128-NEG", Gama = Gama.Media, CreadoEn = DateTimeOffset.UtcNow },
-                new Producto { Id = 2, MarcaId = 1, Modelo = "Galaxy S23", Almacenamiento = "256GB", Ram = "8GB", Color = "Verde", Precio = 2899.00m, CostoReferencial = 2350.00m, ProveedorId = 1, Codigo = "SAM-S23-256-VER", Gama = Gama.Alta, CreadoEn = DateTimeOffset.UtcNow },
-                new Producto { Id = 3, MarcaId = 2, Modelo = "iPhone 13", Almacenamiento = "128GB", Ram = "4GB", Color = "Azul", Precio = 2799.00m, CostoReferencial = 2300.00m, ProveedorId = 2, Codigo = "APP-I13-128-AZU", Gama = Gama.Alta, CreadoEn = DateTimeOffset.UtcNow },
-                new Producto { Id = 4, MarcaId = 2, Modelo = "iPhone 15", Almacenamiento = "256GB", Ram = "6GB", Color = "Negro Titanio", Precio = 4599.00m, CostoReferencial = 3900.00m, ProveedorId = 2, Codigo = "APP-I15-256-NEG", Gama = Gama.Alta, CreadoEn = DateTimeOffset.UtcNow },
-                new Producto { Id = 5, MarcaId = 3, Modelo = "Redmi Note 13", Almacenamiento = "128GB", Ram = "6GB", Color = "Azul", Precio = 749.00m, CostoReferencial = 560.00m, ProveedorId = 3, Codigo = "XIA-RN13-128-AZU", Gama = Gama.Media, CreadoEn = DateTimeOffset.UtcNow },
-                new Producto { Id = 6, MarcaId = 3, Modelo = "Redmi 12", Almacenamiento = "64GB", Ram = "4GB", Color = "Negro", Precio = 499.00m, CostoReferencial = 370.00m, ProveedorId = 3, Codigo = "XIA-R12-64-NEG", Gama = Gama.Baja, CreadoEn = DateTimeOffset.UtcNow },
-                new Producto { Id = 7, MarcaId = 4, Modelo = "Moto G84", Almacenamiento = "256GB", Ram = "12GB", Color = "Verde Menta", Precio = 899.00m, CostoReferencial = 690.00m, ProveedorId = 1, Codigo = "MOT-G84-256-VER", Gama = Gama.Media, CreadoEn = DateTimeOffset.UtcNow },
-                new Producto { Id = 8, MarcaId = 4, Modelo = "Moto E13", Almacenamiento = "64GB", Ram = "4GB", Color = "Negro", Precio = 349.00m, CostoReferencial = 250.00m, ProveedorId = 3, Codigo = "MOT-E13-64-NEG", Gama = Gama.Baja, CreadoEn = DateTimeOffset.UtcNow }
+                new Producto { Id = 1, CategoriaId = 1, MarcaId = 1, Modelo = "Galaxy A54", Almacenamiento = "128GB", Ram = "8GB", Color = "Negro", Precio = 1099.00m, CostoReferencial = 850.00m, ProveedorId = 1, Codigo = "SAM-A54-128-NEG", Gama = Gama.Media, CreadoEn = DateTimeOffset.UtcNow },
+                new Producto { Id = 2, CategoriaId = 1, MarcaId = 1, Modelo = "Galaxy S23", Almacenamiento = "256GB", Ram = "8GB", Color = "Verde", Precio = 2899.00m, CostoReferencial = 2350.00m, ProveedorId = 1, Codigo = "SAM-S23-256-VER", Gama = Gama.Alta, CreadoEn = DateTimeOffset.UtcNow },
+                new Producto { Id = 3, CategoriaId = 1, MarcaId = 2, Modelo = "iPhone 13", Almacenamiento = "128GB", Ram = "4GB", Color = "Azul", Precio = 2799.00m, CostoReferencial = 2300.00m, ProveedorId = 2, Codigo = "APP-I13-128-AZU", Gama = Gama.Alta, CreadoEn = DateTimeOffset.UtcNow },
+                new Producto { Id = 4, CategoriaId = 1, MarcaId = 2, Modelo = "iPhone 15", Almacenamiento = "256GB", Ram = "6GB", Color = "Negro Titanio", Precio = 4599.00m, CostoReferencial = 3900.00m, ProveedorId = 2, Codigo = "APP-I15-256-NEG", Gama = Gama.Alta, CreadoEn = DateTimeOffset.UtcNow },
+                new Producto { Id = 5, CategoriaId = 1, MarcaId = 3, Modelo = "Redmi Note 13", Almacenamiento = "128GB", Ram = "6GB", Color = "Azul", Precio = 749.00m, CostoReferencial = 560.00m, ProveedorId = 3, Codigo = "XIA-RN13-128-AZU", Gama = Gama.Media, CreadoEn = DateTimeOffset.UtcNow },
+                new Producto { Id = 6, CategoriaId = 1, MarcaId = 3, Modelo = "Redmi 12", Almacenamiento = "64GB", Ram = "4GB", Color = "Negro", Precio = 499.00m, CostoReferencial = 370.00m, ProveedorId = 3, Codigo = "XIA-R12-64-NEG", Gama = Gama.Baja, CreadoEn = DateTimeOffset.UtcNow },
+                new Producto { Id = 7, CategoriaId = 1, MarcaId = 4, Modelo = "Moto G84", Almacenamiento = "256GB", Ram = "12GB", Color = "Verde Menta", Precio = 899.00m, CostoReferencial = 690.00m, ProveedorId = 1, Codigo = "MOT-G84-256-VER", Gama = Gama.Media, CreadoEn = DateTimeOffset.UtcNow },
+                new Producto { Id = 8, CategoriaId = 1, MarcaId = 4, Modelo = "Moto E13", Almacenamiento = "64GB", Ram = "4GB", Color = "Negro", Precio = 349.00m, CostoReferencial = 250.00m, ProveedorId = 3, Codigo = "MOT-E13-64-NEG", Gama = Gama.Baja, CreadoEn = DateTimeOffset.UtcNow }
             );
         }
 
@@ -193,17 +204,20 @@ public static class DataSeeder
 
     private static async Task SincronizarSecuenciasIdentityAsync(JascartecDbContext context)
     {
-        // Nombres de tabla fijos y propios (no vienen de entrada de usuario), por eso se arma
-        // el SQL con string.Format en vez de interpolación directa (evita el aviso EF1002 sin
-        // perder la validez de la advertencia para casos con datos externos).
         string[] tablas = ["marcas", "proveedores", "clientes", "productos", "ingresos", "facturas"];
         foreach (var tabla in tablas)
-        {
-            var sql = string.Format(
-                "SELECT setval(pg_get_serial_sequence('{0}', 'id'), COALESCE((SELECT MAX(id) FROM {0}), 1), (SELECT MAX(id) FROM {0}) IS NOT NULL);",
-                tabla);
-            await context.Database.ExecuteSqlRawAsync(sql);
-        }
+            await SincronizarSecuenciaIdentityAsync(context, tabla);
+    }
+
+    // Nombres de tabla fijos y propios (no vienen de entrada de usuario), por eso se arma
+    // el SQL con string.Format en vez de interpolación directa (evita el aviso EF1002 sin
+    // perder la validez de la advertencia para casos con datos externos).
+    private static Task SincronizarSecuenciaIdentityAsync(JascartecDbContext context, string tabla)
+    {
+        var sql = string.Format(
+            "SELECT setval(pg_get_serial_sequence('{0}', 'id'), COALESCE((SELECT MAX(id) FROM {0}), 1), (SELECT MAX(id) FROM {0}) IS NOT NULL);",
+            tabla);
+        return context.Database.ExecuteSqlRawAsync(sql);
     }
 
     private static async Task CrearVentaDemoAsync(

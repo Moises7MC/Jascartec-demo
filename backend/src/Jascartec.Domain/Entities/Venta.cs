@@ -24,7 +24,7 @@ public class Venta
     public ICollection<VentaItem> Items { get; set; } = new List<VentaItem>();
     public ICollection<Abono> Abonos { get; set; } = new List<Abono>();
 
-    public decimal Total => Items.Sum(i => i.PrecioUnit);
+    public decimal Total => Items.Sum(i => i.PrecioUnit * i.Cantidad);
     public decimal MontoPagado => FormaPago == FormaPago.Contado ? Total : Abonos.Sum(a => a.Monto);
     public decimal SaldoPendiente => (Total + Recargo) - MontoPagado;
 }

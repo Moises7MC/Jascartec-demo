@@ -1,4 +1,5 @@
 using Jascartec.Application.Abstractions;
+using Jascartec.Domain.Entities;
 
 namespace Jascartec.Application.Common;
 
@@ -11,10 +12,12 @@ public interface IUnitOfWork
     INegocioRepository Negocios { get; }
     IUsuarioRepository Usuarios { get; }
     IMarcaRepository Marcas { get; }
+    ICategoriaRepository Categorias { get; }
     IProveedorRepository Proveedores { get; }
     IClienteRepository Clientes { get; }
     IProductoRepository Productos { get; }
     IIngresoRepository Ingresos { get; }
+    IRepository<IngresoItem> IngresoItems { get; }
     IEquipoRepository Equipos { get; }
     IFacturaRepository Facturas { get; }
     IVentaRepository Ventas { get; }

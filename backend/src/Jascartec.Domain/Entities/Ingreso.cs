@@ -10,4 +10,6 @@ public class Ingreso
 
     public Proveedor Proveedor { get; set; } = null!;
     public ICollection<Equipo> Equipos { get; set; } = new List<Equipo>();
+    // Líneas por cantidad (sin IMEI) de productos de categorías que no requieren serie individual.
+    public ICollection<IngresoItem> Items { get; set; } = new List<IngresoItem>();
 }

@@ -10,10 +10,12 @@ public class IngresoRepository(JascartecDbContext context) : Repository<Ingreso>
     public async Task<IReadOnlyList<Ingreso>> GetAllWithDetailsAsync(CancellationToken ct = default) =>
         await Set.Include(i => i.Proveedor)
             .Include(i => i.Equipos).ThenInclude(e => e.Producto).ThenInclude(p => p.Marca)
+            .Include(i => i.Items).ThenInclude(it => it.Producto).ThenInclude(p => p.Marca)
             .OrderByDescending(i => i.Fecha).ToListAsync(ct);
 
     public Task<Ingreso?> GetByIdWithDetailsAsync(int id, CancellationToken ct = default) =>
         Set.Include(i => i.Proveedor)
             .Include(i => i.Equipos).ThenInclude(e => e.Producto).ThenInclude(p => p.Marca)
+            .Include(i => i.Items).ThenInclude(it => it.Producto).ThenInclude(p => p.Marca)
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 }

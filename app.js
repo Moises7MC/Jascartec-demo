@@ -44,6 +44,7 @@ const formatHora = (isoDateTime) => isoDateTime
 let negocio = { razonSocial: '', ruc: '', direccion: '', telefono: '', email: '', web: '' };
 let usuarios = [];
 let marcas = [];
+let categorias = [];
 let proveedores = [];
 let clientes = [];
 let productos = [];
@@ -57,8 +58,13 @@ const findProducto = (id) => productos.find(p => p.id === id);
 const findProveedor = (id) => proveedores.find(p => p.id === id);
 const findCliente = (id) => clientes.find(c => c.id === id);
 const findMarca = (id) => marcas.find(m => m.id === id);
+const findCategoria = (id) => categorias.find(c => c.id === id);
 const nombreClienteVenta = (v) => v.cliente; // el backend ya arma "Cliente varios (sin registrar)" si aplica
-const nombreProducto = (p) => p ? `${p.marca} ${p.modelo} ${p.almacenamiento} ${p.color}` : '(modelo eliminado)';
+// Los celulares muestran sus specs (almacenamiento/color); el resto de categorías no las tiene.
+const nombreProducto = (p) => {
+    if (!p) return '(modelo eliminado)';
+    return p.requiereImei ? `${p.marca} ${p.modelo} ${p.almacenamiento} ${p.color}` : `${p.marca} ${p.modelo}`;
+};
 
 // ===================== IMÁGENES DE PRODUCTO =====================
 // Mientras no haya foto real, se genera una silueta de celular coloreada
@@ -159,6 +165,7 @@ $('#confirmCancelBtn').addEventListener('click', () => resolveConfirm(false));
 async function cargarNegocio() { negocio = await api.get('/negocio'); }
 async function cargarUsuarios() { usuarios = await api.get('/usuarios'); }
 async function cargarMarcas() { marcas = await api.get('/marcas'); }
+async function cargarCategorias() { categorias = await api.get('/categorias'); }
 async function cargarProveedores() { proveedores = await api.get('/proveedores'); }
 async function cargarClientes() { clientes = await api.get('/clientes'); }
 async function cargarProductos() { productos = await api.get('/productos'); }
@@ -171,7 +178,7 @@ async function cargarVentas() { ventas = await api.get('/ventas'); }
 // Vendedor no le pedimos esos datos, así evitamos un 403 innecesario.
 async function cargarDatosIniciales() {
     const esAdmin = currentUser.rol === 'Administrador';
-    const tareas = [cargarNegocio(), cargarMarcas(), cargarClientes(), cargarProductos(), cargarVentas()];
+    const tareas = [cargarNegocio(), cargarMarcas(), cargarCategorias(), cargarClientes(), cargarProductos(), cargarVentas()];
     if (esAdmin) tareas.push(cargarProveedores(), cargarIngresos(), cargarFacturas(), cargarUsuarios());
     await Promise.all(tareas);
     if (!esAdmin) { proveedores = []; ingresos = []; facturas = []; usuarios = []; }
@@ -258,8 +265,8 @@ function toggleSidebar() {
 // ===================== NAVEGACIÓN =====================
 const pageTitles = {
     dashboard: { title: 'Dashboard', subtitle: 'Resumen general de tu negocio' },
-    inventario: { title: 'Inventario', subtitle: 'Controla el stock de tus equipos por IMEI' },
-    ingresos: { title: 'Ingresos', subtitle: 'Registro de compras y equipos recibidos' },
+    inventario: { title: 'Inventario', subtitle: 'Controla el stock de todos tus productos' },
+    ingresos: { title: 'Ingresos', subtitle: 'Registro de compras y productos recibidos' },
     ventas: { title: 'Ventas', subtitle: 'Registra y da seguimiento a tu actividad comercial' },
     flujocaja: { title: 'Flujo de Caja', subtitle: 'Todo lo que entra y sale de tu negocio' },
     productos: { title: 'Productos', subtitle: 'Catálogo completo de modelos' },
@@ -267,6 +274,7 @@ const pageTitles = {
     facturas: { title: 'Facturas', subtitle: 'Cuentas por pagar a tus proveedores' },
     clientes: { title: 'Clientes', subtitle: 'Tu cartera de compradores' },
     marcas: { title: 'Marcas', subtitle: 'Marcas disponibles para tus modelos' },
+    categorias: { title: 'Categorías', subtitle: 'Tipos de producto que maneja tu negocio' },
     usuarios: { title: 'Usuarios', subtitle: 'Administra quién tiene acceso al sistema' },
     configuracion: { title: 'Configuración', subtitle: 'Respaldos y administración del sistema' }
 };
@@ -298,6 +306,7 @@ function renderView(view) {
         facturas: renderFacturas,
         clientes: renderClientes,
         marcas: renderMarcas,
+        categorias: renderCategorias,
         usuarios: renderUsuarios
     };
     renderers[view]?.();
@@ -305,6 +314,7 @@ function renderView(view) {
 
 function renderAll() {
     populateSelectMarcas();
+    populateSelectCategorias();
     renderDashboard();
     renderInventario();
     renderIngresos();
@@ -316,6 +326,7 @@ function renderAll() {
     renderFacturas();
     renderClientes();
     renderMarcas();
+    renderCategorias();
     renderUsuarios();
 }
 
@@ -338,15 +349,19 @@ function openModal(id) {
         prodImagenData = null;
         $('#prodImagenPreview').style.display = 'none';
         $('#prodImagenPlaceholder').style.display = '';
+        populateSelectCategoriasProducto();
         populateSelectMarcasProducto();
         populateSelectProveedores('#prodProveedor');
+        toggleCamposCategoriaProducto();
     }
     if (id === 'modalIngreso') {
         ingresoCart = [];
         populateSelectProveedores('#ingProveedor');
         populateSelectProductos('#ingProducto');
         $('#ingImei').value = '';
+        $('#ingCantidad').value = '';
         $('#ingCosto').value = '';
+        toggleCampoImeiIngreso();
         renderIngresoCart();
     }
     if (id === 'modalVenta') {
@@ -359,11 +374,14 @@ function openModal(id) {
         $('#venFrecuencia').value = 'Semanal';
         toggleCampoCredito();
         actualizarTriggerModelo();
+        actualizarModoAgregarVenta();
         $('#venEquipoSel').innerHTML = '';
+        $('#venCantidad').value = '';
         renderVentaCart();
     }
     if (id === 'modalSelectorModelo') {
         $('#selectorModeloSearch').value = '';
+        $('#selectorModeloCategoria').value = '';
         renderSelectorModeloGrid();
     }
     if (id === 'modalCliente') {
@@ -381,6 +399,11 @@ function openModal(id) {
         $('#modalMarcaTitle').textContent = 'Nueva Marca';
         $('#marId').value = '';
         $('#formMarca').reset();
+    }
+    if (id === 'modalCategoria') {
+        $('#modalCategoriaTitle').textContent = 'Nueva Categoría';
+        $('#catId').value = '';
+        $('#formCategoria').reset();
     }
     if (id === 'modalUsuario') {
         $('#modalUsuarioTitle').textContent = 'Nuevo Usuario';
@@ -413,6 +436,15 @@ function populateSelectMarcas() {
 }
 function populateSelectMarcasProducto() {
     $('#prodMarca').innerHTML = marcas.map(m => `<option value="${m.nombre}">${m.nombre}</option>`).join('');
+}
+function populateSelectCategorias() {
+    const opciones = '<option value="">Todas las categorías</option>' +
+        categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+    $('#filterCategoria').innerHTML = opciones;
+    $('#selectorModeloCategoria').innerHTML = opciones;
+}
+function populateSelectCategoriasProducto() {
+    $('#prodCategoria').innerHTML = categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
 }
 function populateSelectProveedores(sel) {
     $(sel).innerHTML = proveedores.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
@@ -520,16 +552,18 @@ function updateCharts() {
 function renderInventario() {
     const busqueda = ($('#invSearch').value || '').toLowerCase();
     const marcaFiltro = $('#filterMarca').value;
+    const categoriaFiltro = $('#filterCategoria').value;
 
     let lista = productos.filter(p => {
         const texto = `${p.marca} ${p.modelo} ${p.codigo}`.toLowerCase();
         const pasaBusqueda = texto.includes(busqueda);
         const pasaMarca = !marcaFiltro || p.marca === marcaFiltro;
-        return pasaBusqueda && pasaMarca;
+        const pasaCategoria = !categoriaFiltro || p.categoriaId === parseInt(categoriaFiltro);
+        return pasaBusqueda && pasaMarca && pasaCategoria;
     });
 
     if (!lista.length) {
-        $('#inventarioBody').innerHTML = `<tr><td colspan="6" class="empty-state">No se encontraron modelos</td></tr>`;
+        $('#inventarioBody').innerHTML = `<tr><td colspan="7" class="empty-state">No se encontraron modelos</td></tr>`;
         return;
     }
 
@@ -541,9 +575,10 @@ function renderInventario() {
                 <td>
                     <div class="table-thumb-row">
                         <img class="table-thumb" src="${productoImagenSrc(p)}" alt="">
-                        <div><strong>${nombreProducto(p)}</strong><br><small class="muted">${p.codigo}</small></div>
+                        <div><strong>${nombreProducto(p)}</strong><br><small class="muted">${p.codigo || '—'}</small></div>
                     </div>
                 </td>
+                <td>${p.categoria}</td>
                 <td>${p.marca}</td>
                 <td>${cant}</td>
                 <td>${formatPEN(p.precio)}</td>
@@ -559,6 +594,7 @@ function renderInventario() {
 }
 $('#invSearch').addEventListener('input', renderInventario);
 $('#filterMarca').addEventListener('change', renderInventario);
+$('#filterCategoria').addEventListener('change', renderInventario);
 $('#globalSearch').addEventListener('input', (e) => {
     if ($('#view-inventario').classList.contains('active')) {
         $('#invSearch').value = e.target.value;
@@ -583,19 +619,35 @@ $('#prodImagenInput').addEventListener('change', (e) => {
     reader.readAsDataURL(file);
 });
 
+// El formulario de Modelo cambia de forma según la categoría elegida: Celulares (con
+// IMEI) sigue pidiendo Almacenamiento/RAM/Color; el resto pide un Detalle libre en su lugar.
+function toggleCamposCategoriaProducto() {
+    const categoria = findCategoria(parseInt($('#prodCategoria').value));
+    const esImei = categoria ? categoria.requiereImei : true;
+    $('#prodSpecsWrap').style.display = esImei ? '' : 'none';
+    $('#prodDescripcionWrap').style.display = esImei ? 'none' : '';
+    $('#prodAlmacenamiento').required = esImei;
+    $('#prodRam').required = esImei;
+    $('#prodColor').required = esImei;
+}
+
 $('#formProducto').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = $('#prodId').value;
     const marcaNombre = $('#prodMarca').value;
     const marca = marcas.find(m => m.nombre === marcaNombre);
+    const categoriaId = parseInt($('#prodCategoria').value);
+    const categoria = findCategoria(categoriaId);
     const existente = id ? findProducto(parseInt(id)) : null;
 
     const payload = {
+        categoriaId,
         marcaId: marca ? marca.id : null,
         modelo: $('#prodModelo').value.trim(),
-        almacenamiento: $('#prodAlmacenamiento').value.trim(),
-        ram: $('#prodRam').value.trim(),
-        color: $('#prodColor').value.trim(),
+        almacenamiento: categoria?.requiereImei ? $('#prodAlmacenamiento').value.trim() : null,
+        ram: categoria?.requiereImei ? $('#prodRam').value.trim() : null,
+        color: categoria?.requiereImei ? $('#prodColor').value.trim() : null,
+        descripcion: categoria?.requiereImei ? null : ($('#prodDescripcion').value.trim() || null),
         gama: $('#prodGama').value,
         precio: parseFloat($('#prodPrecio').value),
         costoReferencial: parseFloat($('#prodCosto').value),
@@ -606,12 +658,13 @@ $('#formProducto').addEventListener('submit', async (e) => {
     };
 
     try {
+        const nombrePreview = nombreProducto({ ...payload, marca: marcaNombre, requiereImei: categoria?.requiereImei });
         if (id) {
             await api.put(`/productos/${id}`, payload);
-            toast(`✓ Modelo "${nombreProducto({ ...payload, marca: marcaNombre })}" actualizado`, 'success');
+            toast(`✓ Modelo "${nombrePreview}" actualizado`, 'success');
         } else {
             await api.post('/productos', payload);
-            toast(`✓ Modelo "${nombreProducto({ ...payload, marca: marcaNombre })}" agregado`, 'success');
+            toast(`✓ Modelo "${nombrePreview}" agregado`, 'success');
         }
         closeModal('modalProducto');
         await cargarProductos();
@@ -631,15 +684,18 @@ function editarProducto(id) {
     $('#prodImagenPreview').style.display = '';
     $('#prodImagenPlaceholder').style.display = 'none';
     $('#prodId').value = p.id;
+    $('#prodCategoria').value = p.categoriaId;
     $('#prodMarca').value = p.marca;
     $('#prodModelo').value = p.modelo;
-    $('#prodAlmacenamiento').value = p.almacenamiento;
-    $('#prodRam').value = p.ram;
-    $('#prodColor').value = p.color;
+    $('#prodAlmacenamiento').value = p.almacenamiento || '';
+    $('#prodRam').value = p.ram || '';
+    $('#prodColor').value = p.color || '';
+    $('#prodDescripcion').value = p.descripcion || '';
     $('#prodGama').value = p.gama;
     $('#prodPrecio').value = p.precio;
     $('#prodCosto').value = p.costoReferencial;
     $('#prodProveedor').value = p.proveedorId;
+    toggleCamposCategoriaProducto();
 }
 
 async function eliminarProducto(id) {
@@ -703,7 +759,7 @@ function renderProductos() {
                         <span class="tag ${est.tag}">${cant} disponibles</span>
                     </div>
                     <div class="product-photo-card__name">${nombreProducto(p)}</div>
-                    <div class="product-photo-card__meta">${p.almacenamiento} · ${p.ram} RAM · ${p.codigo}</div>
+                    <div class="product-photo-card__meta">${p.requiereImei ? `${p.almacenamiento} · ${p.ram} RAM · ` : (p.descripcion ? `${p.descripcion} · ` : '')}${p.codigo || '—'}</div>
                     <div class="product-photo-card__price">${formatPEN(p.precio)}</div>
                     ${isAdmin ? `
                         <div class="product-photo-card__actions">
@@ -792,47 +848,139 @@ function renderMarcas() {
     }).join('');
 }
 
+// ===================== CATEGORÍAS =====================
+$('#formCategoria').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = $('#catId').value;
+    const nombre = $('#catNombre').value.trim();
+    const requiereImei = $('#catRequiereImei').checked;
+
+    try {
+        if (id) {
+            await api.put(`/categorias/${id}`, { nombre, requiereImei });
+            toast(`✓ Categoría "${nombre}" actualizada`, 'success');
+        } else {
+            await api.post('/categorias', { nombre, requiereImei });
+            toast(`✓ Categoría "${nombre}" agregada`, 'success');
+        }
+        closeModal('modalCategoria');
+        await cargarCategorias();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
+});
+
+function editarCategoria(id) {
+    const c = findCategoria(id);
+    if (!c) return;
+    openModal('modalCategoria');
+    $('#modalCategoriaTitle').textContent = 'Editar Categoría';
+    $('#catId').value = c.id;
+    $('#catNombre').value = c.nombre;
+    $('#catRequiereImei').checked = c.requiereImei;
+}
+
+async function eliminarCategoria(id) {
+    const c = findCategoria(id);
+    if (!c) return;
+    const ok = await askConfirm({ title: `¿Eliminar la categoría "${c.nombre}"?`, message: 'Esta acción no se puede deshacer.', confirmText: 'Sí, eliminar' });
+    if (!ok) return;
+    try {
+        await api.del(`/categorias/${id}`);
+        toast('Categoría eliminada', 'success');
+        await cargarCategorias();
+        refrescarUI();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
+}
+
+function renderCategorias() {
+    if (!categorias.length) {
+        $('#categoriasList').innerHTML = '<div class="empty-state">Aún no hay categorías registradas</div>';
+        return;
+    }
+    const isAdmin = currentUser?.rol === 'Administrador';
+    $('#categoriasList').innerHTML = categorias.map(c => {
+        const enUso = productos.filter(p => p.categoriaId === c.id).length;
+        return `
+            <div class="maint-item">
+                <div class="maint-item__info">
+                    <span class="maint-item__name">${c.nombre}</span>
+                    <span class="maint-item__meta">${enUso} modelo${enUso === 1 ? '' : 's'} · ${c.requiereImei ? 'Por IMEI/serie' : 'Por cantidad'}</span>
+                </div>
+                ${isAdmin ? `
+                    <div class="maint-item__actions">
+                        <button class="btn-small" onclick="editarCategoria(${c.id})">Editar</button>
+                        <button class="btn-small-danger" onclick="eliminarCategoria(${c.id})">Eliminar</button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
 // ===================== INGRESOS =====================
 let ingresoCart = [];
 
-function agregarEquipoIngreso() {
+// Cada modelo decide si su línea de ingreso pide IMEI (categoría con serie individual)
+// o Cantidad (categoría por stock simple) — igual criterio que en Registrar Venta.
+function toggleCampoImeiIngreso() {
+    const p = findProducto(parseInt($('#ingProducto').value));
+    const esImei = p ? p.requiereImei : true;
+    $('#ingImeiWrap').style.display = esImei ? '' : 'none';
+    $('#ingCantidadWrap').style.display = esImei ? 'none' : '';
+}
+
+function agregarItemIngreso() {
     const productoId = parseInt($('#ingProducto').value);
-    const imei = $('#ingImei').value.trim();
+    const producto = productoId ? findProducto(productoId) : null;
     const costoUnit = parseFloat($('#ingCosto').value);
 
-    if (!productoId) { toast('✗ Seleccione un modelo', 'error'); return; }
-    if (!/^\d{14,16}$/.test(imei)) { toast('✗ Ingrese un IMEI válido (14 a 16 dígitos)', 'error'); return; }
+    if (!producto) { toast('✗ Seleccione un modelo', 'error'); return; }
     if (!costoUnit || costoUnit <= 0) { toast('✗ Ingrese un costo válido', 'error'); return; }
 
-    if (ingresoCart.some(it => it.imei === imei)) { toast('✗ Ese IMEI ya está en la lista', 'error'); return; }
+    if (producto.requiereImei) {
+        const imei = $('#ingImei').value.trim();
+        if (!/^\d{14,16}$/.test(imei)) { toast('✗ Ingrese un IMEI válido (14 a 16 dígitos)', 'error'); return; }
+        if (ingresoCart.some(it => it.imei === imei)) { toast('✗ Ese IMEI ya está en la lista', 'error'); return; }
 
-    ingresoCart.push({ productoId, imei, costoUnit });
-    $('#ingImei').value = '';
+        ingresoCart.push({ key: `imei-${imei}`, productoId, imei, cantidad: null, costoUnit });
+        $('#ingImei').value = '';
+    } else {
+        const cantidad = parseInt($('#ingCantidad').value);
+        if (!cantidad || cantidad < 1) { toast('✗ Ingrese una cantidad válida', 'error'); return; }
+
+        ingresoCart.push({ key: `prod-${productoId}-${Date.now()}`, productoId, imei: null, cantidad, costoUnit });
+        $('#ingCantidad').value = '';
+    }
     $('#ingCosto').value = '';
     renderIngresoCart();
 }
 
-function quitarEquipoIngreso(imei) {
-    ingresoCart = ingresoCart.filter(it => it.imei !== imei);
+function quitarItemIngreso(key) {
+    ingresoCart = ingresoCart.filter(it => it.key !== key);
     renderIngresoCart();
 }
 
 function renderIngresoCart() {
     if (!ingresoCart.length) {
-        $('#ingresoCartBody').innerHTML = '<tr><td colspan="4" class="empty-state">Sin equipos agregados</td></tr>';
-        $('#ingresoResumen').textContent = 'Aún no ha agregado equipos';
+        $('#ingresoCartBody').innerHTML = '<tr><td colspan="5" class="empty-state">Sin productos agregados</td></tr>';
+        $('#ingresoResumen').textContent = 'Aún no ha agregado productos';
         return;
     }
     $('#ingresoCartBody').innerHTML = ingresoCart.map(it => `
         <tr>
             <td>${nombreProducto(findProducto(it.productoId))}</td>
-            <td>${it.imei}</td>
+            <td>${it.imei || '—'}</td>
+            <td>${it.cantidad ?? 1}</td>
             <td>${formatPEN(it.costoUnit)}</td>
-            <td><button class="btn-icon" onclick="quitarEquipoIngreso('${it.imei}')"><i class='bx bx-trash'></i></button></td>
+            <td><button class="btn-icon" onclick="quitarItemIngreso('${it.key}')"><i class='bx bx-trash'></i></button></td>
         </tr>
     `).join('');
-    const total = ingresoCart.reduce((s, it) => s + it.costoUnit, 0);
-    $('#ingresoResumen').textContent = `${ingresoCart.length} equipo(s) · Total: ${formatPEN(total)}`;
+    const total = ingresoCart.reduce((s, it) => s + it.costoUnit * (it.cantidad ?? 1), 0);
+    $('#ingresoResumen').textContent = `${ingresoCart.length} línea(s) · Total: ${formatPEN(total)}`;
 }
 
 async function confirmarIngreso() {
@@ -840,11 +988,11 @@ async function confirmarIngreso() {
     const numeroFactura = $('#ingFactura').value.trim() || null;
 
     if (!proveedorId) { toast('✗ Seleccione un proveedor', 'error'); return; }
-    if (!ingresoCart.length) { toast('✗ Agregue al menos un equipo', 'error'); return; }
+    if (!ingresoCart.length) { toast('✗ Agregue al menos un producto', 'error'); return; }
 
     try {
         await api.post('/ingresos', { fecha: today(), proveedorId, numeroFactura, items: ingresoCart });
-        toast(`✓ Ingreso registrado: ${ingresoCart.length} equipo(s)`, 'success');
+        toast(`✓ Ingreso registrado: ${ingresoCart.length} línea(s)`, 'success');
         closeModal('modalIngreso');
         ingresoCart = [];
         await Promise.all([cargarIngresos(), cargarProductos()]);
@@ -857,7 +1005,8 @@ async function confirmarIngreso() {
 async function eliminarIngreso(id) {
     const ing = ingresos.find(x => x.id === id);
     if (!ing) return;
-    const ok = await askConfirm({ title: '¿Eliminar este ingreso?', message: `Se eliminarán ${ing.equipos.length} equipo(s) asociados. Esta acción no se puede deshacer.`, confirmText: 'Sí, eliminar' });
+    const cantLineas = ing.equipos.length + ing.items.length;
+    const ok = await askConfirm({ title: '¿Eliminar este ingreso?', message: `Se eliminarán ${cantLineas} línea(s) asociadas (y se descontará el stock que sumaron). Esta acción no se puede deshacer.`, confirmText: 'Sí, eliminar' });
     if (!ok) return;
 
     try {
@@ -874,19 +1023,22 @@ function verIngreso(id) {
     const ing = ingresos.find(x => x.id === id);
     if (!ing) return;
     $('#modalDetalleIngresoTitle').textContent = `Ingreso del ${formatDateLong(ing.fecha)}`;
-    const total = ing.equipos.reduce((s, e) => s + e.costoCompra, 0);
+    const totalEquipos = ing.equipos.reduce((s, e) => s + e.costoCompra, 0);
+    const totalItems = ing.items.reduce((s, it) => s + it.costoUnit * it.cantidad, 0);
+    const cantLineas = ing.equipos.length + ing.items.length;
     $('#detalleIngresoContent').innerHTML = `
         <div class="detalle-grid">
             <div><div class="label">Proveedor</div><div class="value">${ing.proveedor}</div></div>
             <div><div class="label">N° de factura</div><div class="value">${ing.numeroFactura || 'Sin factura'}</div></div>
-            <div><div class="label">Total</div><div class="value">${formatPEN(total)}</div></div>
-            <div><div class="label">Equipos</div><div class="value">${ing.equipos.length}</div></div>
+            <div><div class="label">Total</div><div class="value">${formatPEN(totalEquipos + totalItems)}</div></div>
+            <div><div class="label">Líneas</div><div class="value">${cantLineas}</div></div>
         </div>
         <div class="table-wrap" style="margin-top:1rem;">
             <table class="table table--sm">
-                <thead><tr><th>Modelo</th><th>IMEI</th><th>Costo</th><th>Estado</th></tr></thead>
+                <thead><tr><th>Modelo</th><th>IMEI</th><th>Cant.</th><th>Costo</th><th>Estado</th></tr></thead>
                 <tbody>
-                    ${ing.equipos.map(e => `<tr><td>${e.producto}</td><td>${e.imei}</td><td>${formatPEN(e.costoCompra)}</td><td>${e.estadoVenta}</td></tr>`).join('')}
+                    ${ing.equipos.map(e => `<tr><td>${e.producto}</td><td>${e.imei}</td><td>1</td><td>${formatPEN(e.costoCompra)}</td><td>${e.estadoVenta}</td></tr>`).join('')}
+                    ${ing.items.map(it => `<tr><td>${it.producto}</td><td>—</td><td>${it.cantidad}</td><td>${formatPEN(it.costoUnit)}</td><td>—</td></tr>`).join('')}
                 </tbody>
             </table>
         </div>
@@ -908,13 +1060,14 @@ function renderIngresos() {
         return;
     }
     $('#ingresosBody').innerHTML = lista.map(i => {
-        const total = i.equipos.reduce((s, e) => s + e.costoCompra, 0);
+        const total = i.equipos.reduce((s, e) => s + e.costoCompra, 0) + i.items.reduce((s, it) => s + it.costoUnit * it.cantidad, 0);
+        const cantLineas = i.equipos.length + i.items.length;
         return `
             <tr>
                 <td>${formatDate(i.fecha)}</td>
                 <td>${i.proveedor}</td>
                 <td>${i.numeroFactura || '—'}</td>
-                <td>${i.equipos.length}</td>
+                <td>${cantLineas}</td>
                 <td>${formatPEN(total)}</td>
                 <td class="actions-cell">
                     <button class="btn-small" onclick="verIngreso(${i.id})">Ver</button>
@@ -980,14 +1133,14 @@ function actualizarNumCuotasOptions() {
 }
 
 function actualizarPreviewCredito() {
-    const total = ventaCart.reduce((s, it) => s + it.precioUnit, 0);
+    const total = ventaCart.reduce((s, it) => s + it.precioUnit * it.cantidad, 0);
     const montoInicial = parseFloat($('#venMontoInicial').value);
     const frecuencia = $('#venFrecuencia').value;
     const numCuotas = parseInt($('#venNumCuotas').value);
     const preview = $('#venCreditoPreview');
 
     if (!total) {
-        preview.innerHTML = '<div class="credito-preview__vacio">Agregue equipos al carrito para calcular el crédito</div>';
+        preview.innerHTML = '<div class="credito-preview__vacio">Agregue productos al carrito para calcular el crédito</div>';
         return;
     }
     if (isNaN(montoInicial) || montoInicial < 0 || montoInicial >= total) {
@@ -1100,7 +1253,10 @@ function abrirSelectorModelo() {
 
 function renderSelectorModeloGrid() {
     const busqueda = ($('#selectorModeloSearch').value || '').toLowerCase();
-    const lista = productos.filter(p => nombreProducto(p).toLowerCase().includes(busqueda));
+    const categoriaFiltro = $('#selectorModeloCategoria').value;
+    const lista = productos.filter(p =>
+        nombreProducto(p).toLowerCase().includes(busqueda) &&
+        (!categoriaFiltro || p.categoriaId === parseInt(categoriaFiltro)));
 
     if (!lista.length) {
         $('#selectorModeloGrid').innerHTML = '<div class="empty-state">No se encontraron modelos</div>';
@@ -1121,10 +1277,12 @@ function renderSelectorModeloGrid() {
     }).join('');
 }
 $('#selectorModeloSearch').addEventListener('input', renderSelectorModeloGrid);
+$('#selectorModeloCategoria').addEventListener('change', renderSelectorModeloGrid);
 
 function elegirModeloVenta(productoId) {
     venModeloSeleccionado = productoId;
     actualizarTriggerModelo();
+    actualizarModoAgregarVenta();
     closeModal('modalSelectorModelo');
     cargarEquiposDisponiblesVenta();
 }
@@ -1143,8 +1301,18 @@ function actualizarTriggerModelo() {
     $('#venModeloPrecio').textContent = formatPEN(p.precio);
 }
 
+// El modelo elegido decide si se agrega por IMEI puntual o por cantidad simple.
+function actualizarModoAgregarVenta() {
+    const p = venModeloSeleccionado ? findProducto(venModeloSeleccionado) : null;
+    const esImei = p ? p.requiereImei : true;
+    $('#venImeiWrap').style.display = esImei ? '' : 'none';
+    $('#venCantidadWrap').style.display = esImei ? 'none' : '';
+}
+
 async function cargarEquiposDisponiblesVenta() {
-    if (!venModeloSeleccionado) { $('#venEquipoSel').innerHTML = ''; ventaEquiposDisponiblesCache = []; return; }
+    const p = venModeloSeleccionado ? findProducto(venModeloSeleccionado) : null;
+    if (!p || !p.requiereImei) { $('#venEquipoSel').innerHTML = ''; ventaEquiposDisponiblesCache = []; return; }
+
     const usados = ventaCart.map(it => it.equipoId);
     try {
         const disponibles = await api.get(`/equipos/disponibles?productoId=${venModeloSeleccionado}`);
@@ -1162,53 +1330,74 @@ async function cargarEquiposDisponiblesVenta() {
 
 function agregarProductoVenta() {
     const productoId = venModeloSeleccionado;
-    const equipoId = parseInt($('#venEquipoSel').value);
-    const equipo = ventaEquiposDisponiblesCache.find(e => e.id === equipoId);
     const prod = productoId ? findProducto(productoId) : null;
-    if (!productoId || !equipoId || !prod || !equipo) { toast('✗ Elija un modelo con stock disponible', 'error'); return; }
+    if (!productoId || !prod) { toast('✗ Elija un modelo con stock disponible', 'error'); return; }
 
-    ventaCart.push({ productoId, equipoId, imei: equipo.imei, precioUnit: prod.precio });
-    cargarEquiposDisponiblesVenta();
+    if (prod.requiereImei) {
+        const equipoId = parseInt($('#venEquipoSel').value);
+        const equipo = ventaEquiposDisponiblesCache.find(e => e.id === equipoId);
+        if (!equipoId || !equipo) { toast('✗ Elija un IMEI disponible', 'error'); return; }
+
+        ventaCart.push({ key: `eq-${equipoId}`, productoId, equipoId, imei: equipo.imei, cantidad: 1, precioUnit: prod.precio });
+        cargarEquiposDisponiblesVenta();
+    } else {
+        const cantidad = parseInt($('#venCantidad').value);
+        const yaEnCarrito = ventaCart.filter(it => it.productoId === productoId).reduce((s, it) => s + it.cantidad, 0);
+        if (!cantidad || cantidad < 1) { toast('✗ Ingrese una cantidad válida', 'error'); return; }
+        if (yaEnCarrito + cantidad > stockDisponible(productoId)) { toast(`✗ Stock insuficiente: disponible ${stockDisponible(productoId) - yaEnCarrito}`, 'error'); return; }
+
+        const existente = ventaCart.find(it => it.productoId === productoId && !it.equipoId);
+        if (existente) existente.cantidad += cantidad;
+        else ventaCart.push({ key: `prod-${productoId}`, productoId, equipoId: null, imei: null, cantidad, precioUnit: prod.precio });
+        $('#venCantidad').value = '';
+    }
     renderVentaCart();
 }
 
-function quitarProductoVenta(equipoId) {
-    ventaCart = ventaCart.filter(it => it.equipoId !== equipoId);
+function quitarProductoVenta(key) {
+    ventaCart = ventaCart.filter(it => it.key !== key);
     cargarEquiposDisponiblesVenta();
     renderVentaCart();
 }
 
 function renderVentaCart() {
     if (!ventaCart.length) {
-        $('#ventaCartBody').innerHTML = '<tr><td colspan="4" class="empty-state">Sin equipos agregados</td></tr>';
-        $('#ventaResumen').textContent = 'Aún no ha agregado equipos';
+        $('#ventaCartBody').innerHTML = '<tr><td colspan="5" class="empty-state">Sin productos agregados</td></tr>';
+        $('#ventaResumen').textContent = 'Aún no ha agregado productos';
         return;
     }
     $('#ventaCartBody').innerHTML = ventaCart.map(it => `
         <tr>
             <td>${nombreProducto(findProducto(it.productoId))}</td>
-            <td>${it.imei}</td>
-            <td>${formatPEN(it.precioUnit)}</td>
-            <td><button class="btn-icon" onclick="quitarProductoVenta(${it.equipoId})"><i class='bx bx-trash'></i></button></td>
+            <td>${it.imei || '—'}</td>
+            <td>${it.cantidad}</td>
+            <td>${formatPEN(it.precioUnit * it.cantidad)}</td>
+            <td><button class="btn-icon" onclick="quitarProductoVenta('${it.key}')"><i class='bx bx-trash'></i></button></td>
         </tr>
     `).join('');
-    const total = ventaCart.reduce((s, it) => s + it.precioUnit, 0);
-    $('#ventaResumen').textContent = `${ventaCart.length} equipo(s) · Total: ${formatPEN(total)}`;
+    const total = ventaCart.reduce((s, it) => s + it.precioUnit * it.cantidad, 0);
+    $('#ventaResumen').textContent = `${ventaCart.length} línea(s) · Total: ${formatPEN(total)}`;
     if ($('#venFormaPago').value === 'Crédito') actualizarPreviewCredito();
 }
 
 async function confirmarVenta() {
     const clienteIdRaw = $('#venClienteId').value;
     const clienteId = clienteIdRaw ? parseInt(clienteIdRaw) : null;
-    if (!ventaCart.length) { toast('✗ Agregue al menos un equipo', 'error'); return; }
+    if (!ventaCart.length) { toast('✗ Agregue al menos un producto', 'error'); return; }
 
     const formaPago = $('#venFormaPago').value;
-    const payload = { clienteId, items: ventaCart.map(it => ({ equipoId: it.equipoId })), formaPago };
+    const payload = {
+        clienteId,
+        items: ventaCart.map(it => it.equipoId
+            ? { equipoId: it.equipoId }
+            : { productoId: it.productoId, cantidad: it.cantidad }),
+        formaPago
+    };
 
     if (formaPago === 'Crédito') {
         if (!clienteId) { toast('✗ Para venta a crédito debe seleccionar un cliente registrado', 'error'); return; }
 
-        const total = ventaCart.reduce((s, it) => s + it.precioUnit, 0);
+        const total = ventaCart.reduce((s, it) => s + it.precioUnit * it.cantidad, 0);
         const montoInicial = parseFloat($('#venMontoInicial').value);
         const numCuotas = parseInt($('#venNumCuotas').value);
         if (isNaN(montoInicial) || montoInicial < 0) { toast('✗ Ingrese el monto inicial', 'error'); return; }
@@ -1268,9 +1457,9 @@ function renderBoleta(v) {
             </div>
             <div class="table-wrap" style="margin-top:1rem;">
                 <table class="table table--sm">
-                    <thead><tr><th>Equipo</th><th>IMEI</th><th>Precio</th></tr></thead>
+                    <thead><tr><th>Producto</th><th>IMEI</th><th>Cant.</th><th>Precio</th></tr></thead>
                     <tbody>
-                        ${v.items.map(it => `<tr><td>${it.producto}</td><td>${it.imei}</td><td>${formatPEN(it.precioUnit)}</td></tr>`).join('')}
+                        ${v.items.map(it => `<tr><td>${it.producto}</td><td>${it.imei || '—'}</td><td>${it.cantidad}</td><td>${formatPEN(it.precioUnit * it.cantidad)}</td></tr>`).join('')}
                     </tbody>
                 </table>
             </div>

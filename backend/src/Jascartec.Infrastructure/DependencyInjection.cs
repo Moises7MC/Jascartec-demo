@@ -22,10 +22,12 @@ public static class DependencyInjection
         services.AddScoped<INegocioRepository, NegocioRepository>();
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
         services.AddScoped<IMarcaRepository, MarcaRepository>();
+        services.AddScoped<ICategoriaRepository, CategoriaRepository>();
         services.AddScoped<IProveedorRepository, ProveedorRepository>();
         services.AddScoped<IClienteRepository, ClienteRepository>();
         services.AddScoped<IProductoRepository, ProductoRepository>();
         services.AddScoped<IIngresoRepository, IngresoRepository>();
+        services.AddScoped<IRepository<Jascartec.Domain.Entities.IngresoItem>, Repository<Jascartec.Domain.Entities.IngresoItem>>();
         services.AddScoped<IEquipoRepository, EquipoRepository>();
         services.AddScoped<IFacturaRepository, FacturaRepository>();
         services.AddScoped<IVentaRepository, VentaRepository>();

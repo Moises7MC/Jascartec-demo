@@ -22,7 +22,7 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
     public async Task<IngresoDto> CrearAsync(CrearIngresoRequest request, CancellationToken ct = default)
     {
         if (request.Items.Count == 0)
-            throw new BusinessRuleException("El ingreso debe traer al menos un equipo.");
+            throw new BusinessRuleException("El ingreso debe traer al menos un producto.");
 
         if (await unitOfWork.Proveedores.GetByIdAsync(request.ProveedorId, ct) is null)
             throw new BusinessRuleException($"El proveedor con id '{request.ProveedorId}' no existe.");
@@ -31,10 +31,13 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
         var imeisEnRequest = new HashSet<string>();
         foreach (var item in request.Items)
         {
-            if (!imeisEnRequest.Add(item.Imei))
-                throw new BusinessRuleException($"El IMEI '{item.Imei}' está repetido en el ingreso.");
-            if (await unitOfWork.Equipos.ExisteImeiAsync(item.Imei, ct))
-                throw new BusinessRuleException($"El IMEI '{item.Imei}' ya está registrado en el sistema.");
+            if (!string.IsNullOrWhiteSpace(item.Imei))
+            {
+                if (!imeisEnRequest.Add(item.Imei))
+                    throw new BusinessRuleException($"El IMEI '{item.Imei}' está repetido en el ingreso.");
+                if (await unitOfWork.Equipos.ExisteImeiAsync(item.Imei, ct))
+                    throw new BusinessRuleException($"El IMEI '{item.Imei}' ya está registrado en el sistema.");
+            }
         }
 
         var ingreso = new Ingreso
@@ -44,22 +47,44 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
             NumeroFactura = request.NumeroFactura
         };
         await unitOfWork.Ingresos.AddAsync(ingreso, ct);
-        await unitOfWork.SaveChangesAsync(ct); // necesitamos el Id generado antes de crear los equipos
+        await unitOfWork.SaveChangesAsync(ct); // necesitamos el Id generado antes de crear los items
 
         foreach (var item in request.Items)
         {
-            if (await unitOfWork.Productos.GetByIdAsync(item.ProductoId, ct) is null)
-                throw new BusinessRuleException($"El producto con id '{item.ProductoId}' no existe.");
+            var producto = await unitOfWork.Productos.GetByIdWithDetailsAsync(item.ProductoId, ct)
+                ?? throw new BusinessRuleException($"El producto con id '{item.ProductoId}' no existe.");
 
-            await unitOfWork.Equipos.AddAsync(new Equipo
+            if (producto.Categoria.RequiereImei)
             {
-                ProductoId = item.ProductoId,
-                Imei = item.Imei,
-                CostoCompra = item.CostoUnit,
-                FechaIngreso = request.Fecha,
-                ProveedorId = request.ProveedorId,
-                IngresoId = ingreso.Id
-            }, ct);
+                if (string.IsNullOrWhiteSpace(item.Imei))
+                    throw new BusinessRuleException($"El producto '{producto.Modelo}' requiere IMEI.");
+
+                await unitOfWork.Equipos.AddAsync(new Equipo
+                {
+                    ProductoId = item.ProductoId,
+                    Imei = item.Imei,
+                    CostoCompra = item.CostoUnit,
+                    FechaIngreso = request.Fecha,
+                    ProveedorId = request.ProveedorId,
+                    IngresoId = ingreso.Id
+                }, ct);
+            }
+            else
+            {
+                if (item.Cantidad is null or < 1)
+                    throw new BusinessRuleException($"El producto '{producto.Modelo}' se controla por cantidad: indique cuántas unidades ingresan.");
+
+                await unitOfWork.IngresoItems.AddAsync(new IngresoItem
+                {
+                    IngresoId = ingreso.Id,
+                    ProductoId = item.ProductoId,
+                    Cantidad = item.Cantidad.Value,
+                    CostoUnit = item.CostoUnit
+                }, ct);
+
+                producto.StockCantidad += item.Cantidad.Value;
+                unitOfWork.Productos.Update(producto);
+            }
         }
         await unitOfWork.SaveChangesAsync(ct);
 
@@ -73,14 +98,22 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
             throw new BusinessRuleException("No se puede eliminar: alguno de sus equipos ya fue vendido.");
 
         // Los equipos de este ingreso representan el inventario que trajo — se eliminan
-        // junto con él (misma regla que ya aplicaba el frontend en memoria).
+        // junto con él (misma regla que ya aplicaba el frontend en memoria). Las líneas por
+        // cantidad le devuelven su stock al producto antes de borrarse.
         foreach (var equipo in ingreso.Equipos.ToList())
             unitOfWork.Equipos.Remove(equipo);
+        foreach (var item in ingreso.Items.ToList())
+        {
+            item.Producto.StockCantidad = Math.Max(0, item.Producto.StockCantidad - item.Cantidad);
+            unitOfWork.Productos.Update(item.Producto);
+            unitOfWork.IngresoItems.Remove(item);
+        }
         unitOfWork.Ingresos.Remove(ingreso);
         await unitOfWork.SaveChangesAsync(ct);
     }
 
     private static IngresoDto ToDto(Ingreso i) => new(
         i.Id, i.Fecha, i.ProveedorId, i.Proveedor.Nombre, i.NumeroFactura,
-        i.Equipos.Select(e => new EquipoDto(e.Id, e.ProductoId, $"{e.Producto.Marca.Nombre} {e.Producto.Modelo}", e.Imei, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString())).ToList());
+        i.Equipos.Select(e => new EquipoDto(e.Id, e.ProductoId, $"{e.Producto.Marca.Nombre} {e.Producto.Modelo}", e.Imei, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString())).ToList(),
+        i.Items.Select(it => new IngresoItemDto(it.Id, it.ProductoId, $"{it.Producto.Marca.Nombre} {it.Producto.Modelo}", it.Cantidad, it.CostoUnit)).ToList());
 }

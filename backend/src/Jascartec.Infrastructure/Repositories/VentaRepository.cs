@@ -35,6 +35,7 @@ public class VentaRepository(JascartecDbContext context) : Repository<Venta>(con
 
     private static IQueryable<Venta> IncluirDetalles(IQueryable<Venta> query) => query
         .Include(v => v.Cliente)
-        .Include(v => v.Items).ThenInclude(i => i.Equipo).ThenInclude(e => e.Producto).ThenInclude(p => p.Marca)
+        .Include(v => v.Items).ThenInclude(i => i.Equipo).ThenInclude(e => e!.Producto).ThenInclude(p => p.Marca)
+        .Include(v => v.Items).ThenInclude(i => i.Producto).ThenInclude(p => p!.Marca)
         .Include(v => v.Abonos);
 }

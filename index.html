@@ -122,6 +122,9 @@
                     <a href="#" class="nav-item" data-view="marcas" data-roles="Administrador">
                         <i class='bx bx-purchase-tag'></i> Marcas
                     </a>
+                    <a href="#" class="nav-item" data-view="categorias" data-roles="Administrador">
+                        <i class='bx bx-list-ul'></i> Categorías
+                    </a>
                 </div>
 
                 <div class="nav-section">
@@ -219,8 +222,8 @@
                 <section class="view" id="view-inventario">
                     <div class="view__header">
                         <div>
-                            <h2>Stock de equipos</h2>
-                            <p>Cada celular se controla por su IMEI individual</p>
+                            <h2>Stock de productos</h2>
+                            <p>Controla el stock de todo lo que vendes: celulares por IMEI, el resto por cantidad</p>
                         </div>
                         <button class="btn btn--primary" onclick="openModal('modalProducto')" data-roles="Administrador">
                             <i class='bx bx-plus'></i> Nuevo Modelo
@@ -232,6 +235,9 @@
                             <i class='bx bx-search'></i>
                             <input type="text" id="invSearch" placeholder="Buscar por modelo, marca o código...">
                         </div>
+                        <select id="filterCategoria">
+                            <option value="">Todas las categorías</option>
+                        </select>
                         <select id="filterMarca">
                             <option value="">Todas las marcas</option>
                         </select>
@@ -242,6 +248,7 @@
                             <thead>
                                 <tr>
                                     <th>Modelo</th>
+                                    <th>Categoría</th>
                                     <th>Marca</th>
                                     <th>Disponibles</th>
                                     <th>Precio</th>
@@ -280,7 +287,7 @@
                                     <th>Fecha</th>
                                     <th>Proveedor</th>
                                     <th>Factura</th>
-                                    <th>Equipos</th>
+                                    <th>Líneas</th>
                                     <th>Total</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -346,7 +353,7 @@
                                         <th>Boleta</th>
                                         <th>Fecha</th>
                                         <th>Cliente</th>
-                                        <th>Equipos</th>
+                                        <th>Ítems</th>
                                         <th>Total</th>
                                         <th>Acciones</th>
                                     </tr>
@@ -542,6 +549,20 @@
                     <div class="maint-list" id="marcasList"></div>
                 </section>
 
+                <!-- ============== VIEW: CATEGORÍAS ============== -->
+                <section class="view" id="view-categorias">
+                    <div class="view__header">
+                        <div>
+                            <h2>Categorías de producto</h2>
+                            <p>Celulares, accesorios, impresoras... cada una decide si se controla por IMEI o por cantidad</p>
+                        </div>
+                        <button class="btn btn--primary" onclick="openModal('modalCategoria')">
+                            <i class='bx bx-plus'></i> Nueva Categoría
+                        </button>
+                    </div>
+                    <div class="maint-list" id="categoriasList"></div>
+                </section>
+
                 <!-- ============== VIEW: USUARIOS ============== -->
                 <section class="view" id="view-usuarios">
                     <div class="view__header">
@@ -601,37 +622,45 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
+                        <label>Categoría</label>
+                        <select id="prodCategoria" required onchange="toggleCamposCategoriaProducto()"></select>
+                    </div>
+                    <div class="form-group">
                         <label>Marca</label>
                         <select id="prodMarca" required></select>
                     </div>
-                    <div class="form-group">
-                        <label>Modelo</label>
-                        <input type="text" id="prodModelo" required placeholder="Ej: Galaxy A54">
-                    </div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Almacenamiento</label>
-                        <input type="text" id="prodAlmacenamiento" required placeholder="Ej: 128GB">
-                    </div>
-                    <div class="form-group">
-                        <label>RAM</label>
-                        <input type="text" id="prodRam" required placeholder="Ej: 8GB">
-                    </div>
+                <div class="form-group">
+                    <label>Modelo</label>
+                    <input type="text" id="prodModelo" required placeholder="Ej: Galaxy A54">
                 </div>
-                <div class="form-row">
+                <div id="prodSpecsWrap">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Almacenamiento</label>
+                            <input type="text" id="prodAlmacenamiento" placeholder="Ej: 128GB">
+                        </div>
+                        <div class="form-group">
+                            <label>RAM</label>
+                            <input type="text" id="prodRam" placeholder="Ej: 8GB">
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label>Color</label>
-                        <input type="text" id="prodColor" required placeholder="Ej: Negro">
+                        <input type="text" id="prodColor" placeholder="Ej: Negro">
                     </div>
-                    <div class="form-group">
-                        <label>Gama</label>
-                        <select id="prodGama" required>
-                            <option value="Baja">Baja</option>
-                            <option value="Media">Media</option>
-                            <option value="Alta">Alta</option>
-                        </select>
-                    </div>
+                </div>
+                <div class="form-group" id="prodDescripcionWrap" style="display:none;">
+                    <label>Detalle (opcional)</label>
+                    <input type="text" id="prodDescripcion" placeholder="Ej: Bluetooth 5.0, autonomía 20h">
+                </div>
+                <div class="form-group">
+                    <label>Gama</label>
+                    <select id="prodGama" required>
+                        <option value="Baja">Baja</option>
+                        <option value="Media">Media</option>
+                        <option value="Alta">Alta</option>
+                    </select>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -674,28 +703,32 @@
                 <div class="form-row form-row--imei">
                     <div class="form-group">
                         <label>Modelo</label>
-                        <select id="ingProducto"></select>
+                        <select id="ingProducto" onchange="toggleCampoImeiIngreso()"></select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="ingImeiWrap">
                         <label>IMEI</label>
                         <input type="text" id="ingImei" placeholder="15 dígitos" maxlength="15">
+                    </div>
+                    <div class="form-group" id="ingCantidadWrap" style="display:none;">
+                        <label>Cantidad</label>
+                        <input type="number" id="ingCantidad" min="1" step="1" placeholder="Ej: 10">
                     </div>
                     <div class="form-group">
                         <label>Costo unitario (S/)</label>
                         <input type="number" id="ingCosto" step="0.01" min="0">
                     </div>
-                    <button type="button" class="btn btn--outline" id="ingAgregarBtn" onclick="agregarEquipoIngreso()">
+                    <button type="button" class="btn btn--outline" id="ingAgregarBtn" onclick="agregarItemIngreso()">
                         <i class='bx bx-plus'></i> Agregar
                     </button>
                 </div>
 
                 <div class="table-wrap">
                     <table class="table table--sm">
-                        <thead><tr><th>Modelo</th><th>IMEI</th><th>Costo</th><th></th></tr></thead>
+                        <thead><tr><th>Modelo</th><th>IMEI</th><th>Cant.</th><th>Costo</th><th></th></tr></thead>
                         <tbody id="ingresoCartBody"></tbody>
                     </table>
                 </div>
-                <div class="cart-summary" id="ingresoResumen">Aún no ha agregado equipos</div>
+                <div class="cart-summary" id="ingresoResumen">Aún no ha agregado productos</div>
 
                 <button type="button" class="btn btn--primary btn--full" onclick="confirmarIngreso()">Confirmar Ingreso</button>
             </div>
@@ -789,7 +822,7 @@
                     </div>
                 </div>
 
-                <div class="form-row">
+                <div class="form-row" id="venImeiWrap">
                     <div class="form-group">
                         <label>IMEI disponible</label>
                         <select id="venEquipoSel"></select>
@@ -798,14 +831,23 @@
                         <i class='bx bx-plus'></i> Agregar
                     </button>
                 </div>
+                <div class="form-row" id="venCantidadWrap" style="display:none;">
+                    <div class="form-group">
+                        <label>Cantidad</label>
+                        <input type="number" id="venCantidad" min="1" step="1" placeholder="Ej: 2">
+                    </div>
+                    <button type="button" class="btn btn--outline" onclick="agregarProductoVenta()">
+                        <i class='bx bx-plus'></i> Agregar
+                    </button>
+                </div>
 
                 <div class="table-wrap">
                     <table class="table table--sm">
-                        <thead><tr><th>Modelo</th><th>IMEI</th><th>Precio</th><th></th></tr></thead>
+                        <thead><tr><th>Modelo</th><th>IMEI</th><th>Cant.</th><th>Subtotal</th><th></th></tr></thead>
                         <tbody id="ventaCartBody"></tbody>
                     </table>
                 </div>
-                <div class="cart-summary" id="ventaResumen">Aún no ha agregado equipos</div>
+                <div class="cart-summary" id="ventaResumen">Aún no ha agregado productos</div>
 
                 <button type="button" class="btn btn--primary btn--full" onclick="confirmarVenta()">Confirmar Venta</button>
             </div>
@@ -824,6 +866,9 @@
                     <i class='bx bx-search'></i>
                     <input type="text" id="selectorModeloSearch" placeholder="Buscar por modelo o marca...">
                 </div>
+                <select id="selectorModeloCategoria" style="margin-bottom:1rem;">
+                    <option value="">Todas las categorías</option>
+                </select>
                 <div class="model-picker-grid" id="selectorModeloGrid"></div>
             </div>
         </div>
@@ -945,6 +990,29 @@
                     <input type="text" id="marNombre" required placeholder="Ej: Samsung">
                 </div>
                 <button type="submit" class="btn btn--primary btn--full">Guardar Marca</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Categoría -->
+    <div class="modal" id="modalCategoria">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalCategoriaTitle">Nueva Categoría</h3>
+                <button class="modal__close" onclick="closeModal('modalCategoria')"><i class='bx bx-x'></i></button>
+            </div>
+            <form class="modal__body" id="formCategoria">
+                <input type="hidden" id="catId">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="catNombre" required placeholder="Ej: Accesorios">
+                </div>
+                <label class="form-check">
+                    <input type="checkbox" id="catRequiereImei">
+                    <span>Requiere número de serie/IMEI por unidad (como Celulares)</span>
+                </label>
+                <small class="muted">Si no la marca, el stock de esta categoría se controla por cantidad simple (ideal para accesorios, carcasas, etc.).</small>
+                <button type="submit" class="btn btn--primary btn--full">Guardar Categoría</button>
             </form>
         </div>
     </div>
