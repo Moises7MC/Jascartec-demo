@@ -33,7 +33,9 @@ If Not PuertoResponde("127.0.0.1", 5080) Then
     Loop
 End If
 
-shell.Run """" & chromePath & """ --app=""" & indexUrl & """ --window-size=1366,768"
+' --kiosk-printing: al imprimir el ticket de venta, sale directo a la impresora
+' predeterminada de Windows sin mostrar la ventanita de "elegir impresora".
+shell.Run """" & chromePath & """ --app=""" & indexUrl & """ --window-size=1366,768 --kiosk-printing"
 
 ' ---------- Funciones ----------
 Function PuertoResponde(host, puerto)

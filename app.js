@@ -1534,7 +1534,10 @@ async function confirmarVenta() {
         ventaCart = [];
         await Promise.all([cargarVentas(), cargarProductos()]);
         refrescarUI();
-        setTimeout(() => renderBoleta(nuevaVenta), 400);
+        setTimeout(() => {
+            renderBoleta(nuevaVenta);
+            imprimirTicket(nuevaVenta); // ticket para el cliente, automático al confirmar
+        }, 400);
     } catch (err) {
         toast(`✗ ${err.message}`, 'error');
     }
@@ -1545,7 +1548,70 @@ function verBoleta(ventaId) {
     if (v) renderBoleta(v);
 }
 
+// ===================== TICKET TÉRMICO (80mm) =====================
+// Comprobante interno para el cliente — sin validez ante la SUNAT (el dueño ya lo sabe y
+// no le hace falta). Se imprime en cualquier impresora térmica de tickets instalada en
+// Windows: iniciar_jascartec.vbs abre Chrome con --kiosk-printing para que salga directo,
+// sin la ventanita de "elegir impresora".
+let ventaBoletaActual = null;
+
+function construirTicketHTML(v) {
+    const total = ventaTotal(v);
+    const recargo = v.recargo || 0;
+    const esCredito = v.formaPago === 'Crédito';
+    const proximaCuota = esCredito ? (v.cuotas || []).find(c => !c.pagada) : null;
+
+    const filasItems = v.items.map(it => `
+        <div class="ticket__item">
+            <span class="ticket__item-nombre">${it.cantidad > 1 ? it.cantidad + 'x ' : ''}${it.producto}${it.imei ? ` (IMEI ${it.imei})` : ''}</span>
+            <div class="ticket__row"><span></span><span>${formatPEN(it.precioUnit * it.cantidad)}</span></div>
+        </div>
+    `).join('');
+
+    return `
+        <div class="ticket__center">
+            <div class="ticket__marca">${negocio.razonSocial}</div>
+            <div>${negocio.direccion}</div>
+            <div>Tel: ${negocio.telefono}</div>
+        </div>
+        <hr class="ticket__sep">
+        <div class="ticket__row"><span>Boleta:</span><span>${v.numBoleta}</span></div>
+        <div class="ticket__row"><span>Fecha:</span><span>${formatDateLong(v.fecha)} ${formatHora(v.creadoEn)}</span></div>
+        <div class="ticket__row"><span>Cliente:</span><span>${nombreClienteVenta(v)}</span></div>
+        <div class="ticket__row"><span>Pago:</span><span>${v.formaPago}</span></div>
+        <hr class="ticket__sep">
+        ${filasItems}
+        <hr class="ticket__sep">
+        <div class="ticket__row ticket__total"><span>TOTAL</span><span>${formatPEN(total + recargo)}</span></div>
+        ${esCredito ? `
+            <div class="ticket__row"><span>Inicial pagado:</span><span>${formatPEN(v.montoInicial || 0)}</span></div>
+            <div class="ticket__row"><span>Saldo pendiente:</span><span>${formatPEN(ventaSaldoPendiente(v))}</span></div>
+            ${proximaCuota ? `<div class="ticket__row"><span>Próx. cuota:</span><span>${formatDateLong(proximaCuota.fechaVencimiento)}</span></div>` : ''}
+        ` : ''}
+        <hr class="ticket__sep">
+        <div class="ticket__center ticket__small">
+            Este ticket es un comprobante interno de venta, sin validez tributaria ante la SUNAT.<br>
+            Consérvelo para cualquier reclamo.
+        </div>
+        <hr class="ticket__sep">
+        <div class="ticket__center">
+            <div>¡Gracias por su compra!</div>
+            <div>${negocio.web}</div>
+        </div>
+    `;
+}
+
+function imprimirTicket(v) {
+    $('#ticketImprimible').innerHTML = construirTicketHTML(v);
+    window.print();
+}
+
+function imprimirTicketBoleta() {
+    if (ventaBoletaActual) imprimirTicket(ventaBoletaActual);
+}
+
 function renderBoleta(v) {
+    ventaBoletaActual = v;
     const total = ventaTotal(v);
     const igv = total - total / 1.18;
 

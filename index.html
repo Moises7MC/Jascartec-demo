@@ -1016,8 +1016,16 @@
                 <button class="modal__close" onclick="closeModal('modalBoleta')"><i class='bx bx-x'></i></button>
             </div>
             <div class="modal__body" id="boletaContent"></div>
+            <div class="modal__body" style="padding-top:0;">
+                <button type="button" class="btn btn--outline btn--full" id="boletaImprimirBtn" onclick="imprimirTicketBoleta()">
+                    <i class='bx bx-printer'></i> Imprimir ticket
+                </button>
+            </div>
         </div>
     </div>
+
+    <!-- Ticket térmico 80mm — oculto en pantalla, solo se muestra al imprimir -->
+    <div id="ticketImprimible"></div>
 
     <!-- Cliente -->
     <div class="modal" id="modalCliente">

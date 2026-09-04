@@ -1011,6 +1011,38 @@ img {
 .boleta__total-final { font-weight: var(--font-bold); font-size: 1.05rem; color: var(--title-color); border-top: 1px solid var(--border-color); padding-top: .4rem; margin-top: .2rem; }
 .boleta__footer { text-align: center; font-size: var(--smaller-font-size); color: var(--text-color-light); margin-top: .5rem; }
 
+/*=============== TICKET TÉRMICO (impresión en impresora de 80mm) ===============*/
+/* En pantalla queda oculto siempre; solo aparece dentro de @media print, y ahí
+   se oculta todo lo demás — así "Imprimir" solo saca el ticket, no la pantalla completa. */
+#ticketImprimible { display: none; }
+
+@media print {
+  @page { size: 80mm auto; margin: 0; }
+  body * { visibility: hidden; }
+  #ticketImprimible, #ticketImprimible * { visibility: visible; }
+  #ticketImprimible {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 80mm;
+    padding: 3mm 3.5mm;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 9.5pt;
+    line-height: 1.35;
+    color: #000;
+  }
+}
+
+.ticket__center { text-align: center; }
+.ticket__marca { font-weight: bold; font-size: 11pt; }
+.ticket__sep { border: none; border-top: 1px dashed #000; margin: 2mm 0; }
+.ticket__row { display: flex; justify-content: space-between; gap: 3mm; }
+.ticket__item { margin-bottom: 1mm; }
+.ticket__item-nombre { display: block; }
+.ticket__total { font-weight: bold; font-size: 11pt; }
+.ticket__small { font-size: 7.5pt; }
+
 /*=============== TOAST ===============*/
 .toast {
   position: fixed;
