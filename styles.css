@@ -504,6 +504,37 @@ img {
 .tab-btn.active { color: var(--first-color-alt); border-color: var(--first-color); }
 
 .date-filters { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+/*=============== REPORTES DE VENTAS ===============*/
+.reporte-controles { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.reporte-controles select {
+  border: 1.5px solid var(--border-color);
+  border-radius: 2rem;
+  padding: .6rem 1.25rem;
+  background: var(--body-color);
+  color: var(--title-color);
+}
+.reporte-nav { display: flex; align-items: center; gap: .5rem; }
+.reporte-nav label { display: flex; flex-direction: column; gap: .3rem; font-size: var(--smaller-font-size); color: var(--text-color-light); }
+.reporte-nav input[type="date"] {
+  border: 1.5px solid var(--border-color);
+  border-radius: .5rem;
+  padding: .55rem .75rem;
+  color: var(--title-color);
+}
+.btn-icon-nav {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-color);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-color);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  transition: background .2s, border-color .2s, color .2s;
+}
+.btn-icon-nav:hover { background: var(--first-color-light); border-color: var(--first-color); color: var(--first-color-alt); }
+.reporte-exportar { display: flex; gap: .5rem; margin-left: auto; }
+.reporte-periodo-label { font-size: var(--normal-font-size); font-weight: var(--font-semi-bold); color: var(--title-color); margin: .25rem 0 1.1rem; }
 .date-filters label { display: flex; flex-direction: column; gap: .3rem; font-size: var(--smaller-font-size); color: var(--text-color-light); }
 .date-filters input {
   border: 1.5px solid var(--border-color);

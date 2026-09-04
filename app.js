@@ -1760,7 +1760,9 @@ function cambiarTabVentas(tab) {
     $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.ventasTab === tab));
     $('#ventasTabRegistro').style.display = tab === 'registro' ? '' : 'none';
     $('#ventasTabCreditos').style.display = tab === 'creditos' ? '' : 'none';
+    $('#ventasTabReportes').style.display = tab === 'reportes' ? '' : 'none';
     if (tab === 'creditos') renderCreditos();
+    if (tab === 'reportes') renderReporteVentas();
 }
 
 function renderCreditos() {
@@ -1807,6 +1809,203 @@ function renderCreditos() {
     }).join('');
 }
 $('#credSearch').addEventListener('input', renderCreditos);
+
+// ===================== REPORTES DE VENTAS =====================
+let repFechaAncla = today(); // fecha "eje" para diario/semanal/quincenal/mensual
+let chartReporteVentas = null;
+
+const sumarDias = (fechaISO, dias) => {
+    const d = new Date(fechaISO + 'T00:00:00');
+    d.setDate(d.getDate() + dias);
+    return fechaLocalISO(d);
+};
+const lunesDeLaSemana = (fechaISO) => {
+    const d = new Date(fechaISO + 'T00:00:00');
+    const dow = d.getDay(); // 0=domingo … 6=sábado
+    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+    return fechaLocalISO(d);
+};
+const ultimoDiaDelMes = (fechaISO) => {
+    const d = new Date(fechaISO + 'T00:00:00');
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+};
+
+// Convierte el tipo de período + la fecha eje (o el rango elegido a mano) en un [desde, hasta].
+function calcularRangoReporte() {
+    const tipo = $('#repTipoPeriodo').value;
+    const anio = repFechaAncla.slice(0, 4);
+    const mes = repFechaAncla.slice(0, 7);
+    const dia = parseInt(repFechaAncla.slice(8, 10));
+
+    if (tipo === 'diario') return { desde: repFechaAncla, hasta: repFechaAncla };
+    if (tipo === 'semanal') {
+        const lunes = lunesDeLaSemana(repFechaAncla);
+        return { desde: lunes, hasta: sumarDias(lunes, 6) };
+    }
+    if (tipo === 'quincenal') {
+        return dia <= 15
+            ? { desde: `${mes}-01`, hasta: `${mes}-15` }
+            : { desde: `${mes}-16`, hasta: `${mes}-${String(ultimoDiaDelMes(repFechaAncla)).padStart(2, '0')}` };
+    }
+    if (tipo === 'mensual') {
+        return { desde: `${mes}-01`, hasta: `${mes}-${String(ultimoDiaDelMes(repFechaAncla)).padStart(2, '0')}` };
+    }
+    // Rango personalizado
+    const desde = $('#repDesde').value || repFechaAncla;
+    const hasta = $('#repHasta').value || repFechaAncla;
+    return desde <= hasta ? { desde, hasta } : { desde: hasta, hasta: desde };
+}
+
+// Botones ‹ › : retrocede o avanza un período completo (un día, una semana, una quincena o un mes).
+function moverPeriodoReporte(direccion) {
+    const tipo = $('#repTipoPeriodo').value;
+    if (tipo === 'diario') {
+        repFechaAncla = sumarDias(repFechaAncla, direccion);
+    } else if (tipo === 'semanal') {
+        repFechaAncla = sumarDias(repFechaAncla, 7 * direccion);
+    } else if (tipo === 'mensual') {
+        const d = new Date(repFechaAncla + 'T00:00:00');
+        d.setMonth(d.getMonth() + direccion, 1);
+        repFechaAncla = fechaLocalISO(d);
+    } else if (tipo === 'quincenal') {
+        const dia = parseInt(repFechaAncla.slice(8, 10));
+        const d = new Date(repFechaAncla + 'T00:00:00');
+        if (direccion > 0) { if (dia <= 15) d.setDate(16); else d.setMonth(d.getMonth() + 1, 1); }
+        else { if (dia <= 15) d.setMonth(d.getMonth() - 1, 16); else d.setDate(1); }
+        repFechaAncla = fechaLocalISO(d);
+    }
+    $('#repFecha').value = repFechaAncla;
+    renderReporteVentas();
+}
+
+function cambiarTipoPeriodoReporte() {
+    const esRango = $('#repTipoPeriodo').value === 'rango';
+    $('#repNavAncla').style.display = esRango ? 'none' : '';
+    $('#repRangoWrap').style.display = esRango ? '' : 'none';
+    if (esRango && !$('#repDesde').value) {
+        $('#repDesde').value = repFechaAncla;
+        $('#repHasta').value = repFechaAncla;
+    }
+    renderReporteVentas();
+}
+$('#repTipoPeriodo').addEventListener('change', cambiarTipoPeriodoReporte);
+$('#repFecha').addEventListener('change', () => { repFechaAncla = $('#repFecha').value || today(); renderReporteVentas(); });
+$('#repDesde').addEventListener('change', renderReporteVentas);
+$('#repHasta').addEventListener('change', renderReporteVentas);
+
+function renderReporteVentas() {
+    if (!$('#repFecha').value) $('#repFecha').value = repFechaAncla;
+    const { desde, hasta } = calcularRangoReporte();
+    $('#repPeriodoLabel').textContent = desde === hasta
+        ? formatDateLong(desde)
+        : `${formatDateLong(desde)} — ${formatDateLong(hasta)}`;
+
+    const enRango = ventas.filter(v => v.fecha >= desde && v.fecha <= hasta);
+    const activas = enRango.filter(v => !ventaEstaAnulada(v));
+    const totalVendido = activas.reduce((s, v) => s + ventaTotal(v), 0);
+    const totalContado = activas.filter(v => v.formaPago !== 'Crédito').reduce((s, v) => s + ventaTotal(v), 0);
+    const totalCredito = activas.filter(v => v.formaPago === 'Crédito').reduce((s, v) => s + ventaTotal(v), 0);
+
+    $('#repTotalVendido').textContent = formatPEN(totalVendido);
+    $('#repNumVentas').textContent = activas.length;
+    $('#repTicketProm').textContent = formatPEN(activas.length ? totalVendido / activas.length : 0);
+    $('#repTotalContado').textContent = formatPEN(totalContado);
+    $('#repTotalCredito').textContent = formatPEN(totalCredito);
+
+    const lista = [...enRango].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id - b.id);
+    $('#reporteVentasBody').innerHTML = lista.length ? lista.map(v => {
+        const anulada = ventaEstaAnulada(v);
+        return `
+            <tr style="${anulada ? 'opacity:.55;' : ''}">
+                <td><strong style="${anulada ? 'text-decoration:line-through;' : ''}">${v.numBoleta}</strong></td>
+                <td>${formatDate(v.fecha)} <small class="muted">${formatHora(v.creadoEn)}</small></td>
+                <td>${nombreClienteVenta(v)}</td>
+                <td>${v.formaPago}</td>
+                <td>${formatPEN(ventaTotal(v))}</td>
+                <td>${anulada ? '<span class="tag tag-red">Anulada</span>' : '<span class="tag tag-green">Activa</span>'}</td>
+            </tr>
+        `;
+    }).join('') : '<tr><td colspan="6" class="empty-state">No hay ventas registradas en este período</td></tr>';
+
+    renderReporteChart(desde, hasta, activas);
+}
+
+function renderReporteChart(desde, hasta, activas) {
+    const ctx = document.getElementById('chartReporteVentas');
+    if (!ctx || typeof Chart === 'undefined') return;
+
+    const dias = [];
+    for (let d = desde; d <= hasta && dias.length <= 62; d = sumarDias(d, 1)) dias.push(d);
+
+    if (chartReporteVentas) { chartReporteVentas.destroy(); chartReporteVentas = null; }
+    if (dias.length > 62) { // rango demasiado largo para un gráfico por día
+        ctx.style.display = 'none';
+        $('#chartReporteVentasVacio').style.display = '';
+        return;
+    }
+    ctx.style.display = '';
+    $('#chartReporteVentasVacio').style.display = 'none';
+
+    const totalesPorDia = dias.map(d => activas.filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
+    chartReporteVentas = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: dias.map(formatDate), datasets: [{ label: 'Total vendido', data: totalesPorDia, backgroundColor: 'hsl(199, 92%, 50%)', borderRadius: 4 }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+}
+
+// ---------- Exportar ----------
+function filasReporteParaExportar() {
+    const { desde, hasta } = calcularRangoReporte();
+    const lista = ventas.filter(v => v.fecha >= desde && v.fecha <= hasta).sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id - b.id);
+    return { desde, hasta, lista };
+}
+
+function exportarReporteExcel() {
+    const { desde, hasta, lista } = filasReporteParaExportar();
+    if (!lista.length) { toast('✗ No hay ventas en este período para exportar', 'error'); return; }
+
+    const filas = lista.map(v => ({
+        'Boleta': v.numBoleta,
+        'Fecha': formatDateLong(v.fecha),
+        'Hora': formatHora(v.creadoEn),
+        'Cliente': nombreClienteVenta(v),
+        'Documento': v.clienteDocumento || '',
+        'Forma de pago': v.formaPago,
+        'Total (S/)': ventaTotal(v),
+        'Estado': v.estado
+    }));
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, 'Ventas');
+    XLSX.writeFile(libro, `reporte-ventas_${desde}_a_${hasta}.xlsx`);
+}
+
+function exportarReportePDF() {
+    const { desde, hasta, lista } = filasReporteParaExportar();
+    if (!lista.length) { toast('✗ No hay ventas en este período para exportar', 'error'); return; }
+
+    const activas = lista.filter(v => !ventaEstaAnulada(v));
+    const totalVendido = activas.reduce((s, v) => s + ventaTotal(v), 0);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Jascartec — Reporte de ventas', 14, 18);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Período: ${formatDateLong(desde)} — ${formatDateLong(hasta)}`, 14, 26);
+    doc.text(`Total vendido: ${formatPEN(totalVendido)}   ·   N° de ventas: ${activas.length}   ·   Ticket promedio: ${formatPEN(activas.length ? totalVendido / activas.length : 0)}`, 14, 32);
+
+    doc.autoTable({
+        startY: 38,
+        head: [['Boleta', 'Fecha', 'Cliente', 'Forma de pago', 'Total', 'Estado']],
+        body: lista.map(v => [v.numBoleta, formatDate(v.fecha), nombreClienteVenta(v), v.formaPago, formatPEN(ventaTotal(v)), ventaEstaAnulada(v) ? 'Anulada' : 'Activa']),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [16, 145, 224] }
+    });
+    doc.save(`reporte-ventas_${desde}_a_${hasta}.pdf`);
+}
 
 // ===================== FLUJO DE CAJA =====================
 function calcularMovimientosCaja(desde, hasta) {

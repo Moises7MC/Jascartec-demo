@@ -16,6 +16,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Exportar reportes de ventas a Excel y PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -329,6 +333,9 @@
                         <button type="button" class="tab-btn" data-ventas-tab="creditos" onclick="cambiarTabVentas('creditos')">
                             <i class='bx bx-credit-card'></i> Créditos
                         </button>
+                        <button type="button" class="tab-btn" data-ventas-tab="reportes" onclick="cambiarTabVentas('reportes')">
+                            <i class='bx bx-bar-chart-alt-2'></i> Reportes
+                        </button>
                     </div>
 
                     <div class="ventas-tab-panel" id="ventasTabRegistro">
@@ -409,6 +416,76 @@
                                     </tr>
                                 </thead>
                                 <tbody id="creditosBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="ventas-tab-panel" id="ventasTabReportes" style="display:none;">
+                        <div class="reporte-controles">
+                            <select id="repTipoPeriodo">
+                                <option value="diario">Diario</option>
+                                <option value="semanal">Semanal</option>
+                                <option value="quincenal">Quincenal</option>
+                                <option value="mensual">Mensual</option>
+                                <option value="rango">Rango personalizado</option>
+                            </select>
+                            <div class="reporte-nav" id="repNavAncla">
+                                <button type="button" class="btn-icon-nav" onclick="moverPeriodoReporte(-1)"><i class='bx bx-chevron-left'></i></button>
+                                <input type="date" id="repFecha">
+                                <button type="button" class="btn-icon-nav" onclick="moverPeriodoReporte(1)"><i class='bx bx-chevron-right'></i></button>
+                            </div>
+                            <div class="reporte-nav" id="repRangoWrap" style="display:none;">
+                                <label>Desde <input type="date" id="repDesde"></label>
+                                <label>Hasta <input type="date" id="repHasta"></label>
+                            </div>
+                            <div class="reporte-exportar">
+                                <button type="button" class="btn-small-outline" onclick="exportarReporteExcel()"><i class='bx bx-file'></i> Excel</button>
+                                <button type="button" class="btn-small-outline" onclick="exportarReportePDF()"><i class='bx bxs-file-pdf'></i> PDF</button>
+                            </div>
+                        </div>
+                        <h3 class="reporte-periodo-label" id="repPeriodoLabel"></h3>
+
+                        <div class="stats-grid stats-grid--compact">
+                            <div class="stat-card">
+                                <span class="stat-card__label">Total vendido</span>
+                                <span class="stat-card__value" id="repTotalVendido">S/ 0.00</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-card__label">N° de ventas</span>
+                                <span class="stat-card__value" id="repNumVentas">0</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-card__label">Ticket promedio</span>
+                                <span class="stat-card__value" id="repTicketProm">S/ 0.00</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-card__label">Al contado</span>
+                                <span class="stat-card__value stat-card__value--green" id="repTotalContado">S/ 0.00</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-card__label">A crédito</span>
+                                <span class="stat-card__value" id="repTotalCredito">S/ 0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <canvas id="chartReporteVentas" height="90"></canvas>
+                            <div class="empty-state" id="chartReporteVentasVacio" style="display:none;">El rango elegido es muy amplio para mostrar el gráfico por día (máx. 62 días) — el detalle sigue completo en la tabla y en las exportaciones.</div>
+                        </div>
+
+                        <div class="table-wrap" style="margin-top:1.25rem;">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Boleta</th>
+                                        <th>Fecha</th>
+                                        <th>Cliente</th>
+                                        <th>Forma de pago</th>
+                                        <th>Total</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reporteVentasBody"></tbody>
                             </table>
                         </div>
                     </div>
