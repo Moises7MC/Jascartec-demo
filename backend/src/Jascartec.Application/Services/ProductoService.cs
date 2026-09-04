@@ -108,6 +108,6 @@ public class ProductoService(IUnitOfWork unitOfWork) : IProductoService
             p.Id, p.CategoriaId, p.Categoria.Nombre, p.Categoria.RequiereImei, p.MarcaId, p.Marca.Nombre, p.Modelo,
             p.Almacenamiento, p.Ram, p.Color, p.Descripcion,
             p.Precio, p.CostoReferencial, p.ProveedorId, p.Proveedor?.Nombre, p.Codigo,
-            p.Gama?.ToString(), p.ImagenUrl, stock);
+            p.Gama?.ToString(), p.ImagenUrl, stock, p.CreadoEn);
     }
 }

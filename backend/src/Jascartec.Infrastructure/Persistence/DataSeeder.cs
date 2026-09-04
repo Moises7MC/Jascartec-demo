@@ -112,14 +112,14 @@ public static class DataSeeder
         {
             var ingresos = new[]
             {
-                new Ingreso { Id = 1, Fecha = new DateOnly(2026, 4, 20), ProveedorId = 1, NumeroFactura = "F001-5521" },
-                new Ingreso { Id = 2, Fecha = new DateOnly(2026, 4, 19), ProveedorId = 2, NumeroFactura = "F002-3310" },
-                new Ingreso { Id = 3, Fecha = new DateOnly(2026, 4, 18), ProveedorId = 3, NumeroFactura = null },
-                new Ingreso { Id = 4, Fecha = new DateOnly(2026, 4, 15), ProveedorId = 2, NumeroFactura = "F002-3298" },
-                new Ingreso { Id = 5, Fecha = new DateOnly(2026, 4, 12), ProveedorId = 1, NumeroFactura = null },
-                new Ingreso { Id = 6, Fecha = new DateOnly(2026, 4, 10), ProveedorId = 3, NumeroFactura = null },
-                new Ingreso { Id = 7, Fecha = new DateOnly(2026, 4, 8), ProveedorId = 3, NumeroFactura = null },
-                new Ingreso { Id = 8, Fecha = new DateOnly(2026, 4, 5), ProveedorId = 1, NumeroFactura = "F001-5498" }
+                new Ingreso { Id = 1, Fecha = new DateOnly(2026, 4, 20), ProveedorId = 1, NumeroFactura = "F001-5521", CreadoEn = new DateTimeOffset(2026, 4, 20, 17, 0, 0, TimeSpan.FromHours(-5)) },
+                new Ingreso { Id = 2, Fecha = new DateOnly(2026, 4, 19), ProveedorId = 2, NumeroFactura = "F002-3310", CreadoEn = new DateTimeOffset(2026, 4, 19, 17, 0, 0, TimeSpan.FromHours(-5)) },
+                new Ingreso { Id = 3, Fecha = new DateOnly(2026, 4, 18), ProveedorId = 3, NumeroFactura = null, CreadoEn = new DateTimeOffset(2026, 4, 18, 17, 0, 0, TimeSpan.FromHours(-5)) },
+                new Ingreso { Id = 4, Fecha = new DateOnly(2026, 4, 15), ProveedorId = 2, NumeroFactura = "F002-3298", CreadoEn = new DateTimeOffset(2026, 4, 15, 17, 0, 0, TimeSpan.FromHours(-5)) },
+                new Ingreso { Id = 5, Fecha = new DateOnly(2026, 4, 12), ProveedorId = 1, NumeroFactura = null, CreadoEn = new DateTimeOffset(2026, 4, 12, 17, 0, 0, TimeSpan.FromHours(-5)) },
+                new Ingreso { Id = 6, Fecha = new DateOnly(2026, 4, 10), ProveedorId = 3, NumeroFactura = null, CreadoEn = new DateTimeOffset(2026, 4, 10, 17, 0, 0, TimeSpan.FromHours(-5)) },
+                new Ingreso { Id = 7, Fecha = new DateOnly(2026, 4, 8), ProveedorId = 3, NumeroFactura = null, CreadoEn = new DateTimeOffset(2026, 4, 8, 17, 0, 0, TimeSpan.FromHours(-5)) },
+                new Ingreso { Id = 8, Fecha = new DateOnly(2026, 4, 5), ProveedorId = 1, NumeroFactura = "F001-5498", CreadoEn = new DateTimeOffset(2026, 4, 5, 17, 0, 0, TimeSpan.FromHours(-5)) }
             };
             context.Ingresos.AddRange(ingresos);
             await context.SaveChangesAsync();

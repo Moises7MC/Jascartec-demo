@@ -7,6 +7,9 @@ public class Ingreso
     public DateOnly Fecha { get; set; }
     public int ProveedorId { get; set; }
     public string? NumeroFactura { get; set; }
+    // Momento exacto en que se registró (distinto de Fecha, que es la fecha de compra que
+    // escribe el vendedor) — para poder mostrar la hora real en el listado, como en Venta.
+    public DateTimeOffset CreadoEn { get; set; }
 
     public Proveedor Proveedor { get; set; } = null!;
     public ICollection<Equipo> Equipos { get; set; } = new List<Equipo>();

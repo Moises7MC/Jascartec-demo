@@ -44,7 +44,8 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
         {
             Fecha = request.Fecha,
             ProveedorId = request.ProveedorId,
-            NumeroFactura = request.NumeroFactura
+            NumeroFactura = request.NumeroFactura,
+            CreadoEn = DateTimeOffset.UtcNow
         };
         await unitOfWork.Ingresos.AddAsync(ingreso, ct);
         await unitOfWork.SaveChangesAsync(ct); // necesitamos el Id generado antes de crear los items
@@ -115,5 +116,6 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
     private static IngresoDto ToDto(Ingreso i) => new(
         i.Id, i.Fecha, i.ProveedorId, i.Proveedor.Nombre, i.NumeroFactura,
         i.Equipos.Select(e => new EquipoDto(e.Id, e.ProductoId, $"{e.Producto.Marca.Nombre} {e.Producto.Modelo}", e.Imei, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString())).ToList(),
-        i.Items.Select(it => new IngresoItemDto(it.Id, it.ProductoId, $"{it.Producto.Marca.Nombre} {it.Producto.Modelo}", it.Cantidad, it.CostoUnit)).ToList());
+        i.Items.Select(it => new IngresoItemDto(it.Id, it.ProductoId, $"{it.Producto.Marca.Nombre} {it.Producto.Modelo}", it.Cantidad, it.CostoUnit)).ToList(),
+        i.CreadoEn);
 }

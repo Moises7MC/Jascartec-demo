@@ -39,6 +39,15 @@ const today = () => fechaLocalISO();
 const formatHora = (isoDateTime) => isoDateTime
     ? new Date(isoDateTime).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false })
     : '';
+// Fecha + hora de un timestamp completo (creadoEn) para columnas "Registrado"/"Agregado" —
+// a diferencia de formatDate (que espera una fecha simple YYYY-MM-DD), acá el string ya trae
+// su propia zona horaria, así que se arma directo con new Date(), sin agregarle T00:00:00.
+const formatFechaHora = (isoDateTime) => {
+    if (!isoDateTime) return '—';
+    const d = new Date(isoDateTime);
+    const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return `${d.getDate()} ${meses[d.getMonth()]} <small class="muted">${formatHora(isoDateTime)}</small>`;
+};
 
 // ===================== ESTADO GLOBAL (llenado desde la API) =====================
 let negocio = { razonSocial: '', ruc: '', direccion: '', telefono: '', email: '', web: '' };
@@ -580,7 +589,7 @@ function renderInventario() {
     });
 
     if (!lista.length) {
-        $('#inventarioBody').innerHTML = `<tr><td colspan="7" class="empty-state">No se encontraron modelos</td></tr>`;
+        $('#inventarioBody').innerHTML = `<tr><td colspan="8" class="empty-state">No se encontraron modelos</td></tr>`;
         return;
     }
 
@@ -600,6 +609,7 @@ function renderInventario() {
                 <td>${cant}</td>
                 <td>${formatPEN(p.precio)}</td>
                 <td><span class="tag ${est.tag}">${est.texto}</span></td>
+                <td>${formatFechaHora(p.creadoEn)}</td>
                 <td class="actions-cell">
                     <button class="btn-small" onclick="editarProducto(${p.id})" data-roles="Administrador">Editar</button>
                     <button class="btn-small-danger" onclick="eliminarProducto(${p.id})" data-roles="Administrador">Eliminar</button>
@@ -1049,6 +1059,7 @@ function verIngreso(id) {
             <div><div class="label">N° de factura</div><div class="value">${ing.numeroFactura || 'Sin factura'}</div></div>
             <div><div class="label">Total</div><div class="value">${formatPEN(totalEquipos + totalItems)}</div></div>
             <div><div class="label">Líneas</div><div class="value">${cantLineas}</div></div>
+            <div><div class="label">Registrado</div><div class="value">${formatFechaHora(ing.creadoEn)}</div></div>
         </div>
         <div class="table-wrap" style="margin-top:1rem;">
             <table class="table table--sm">
@@ -1098,7 +1109,7 @@ function renderIngresos() {
     }
 
     if (!lista.length) {
-        $('#ingresosBody').innerHTML = '<tr><td colspan="6" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
+        $('#ingresosBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
         return;
     }
     $('#ingresosBody').innerHTML = lista.map(i => {
@@ -1111,6 +1122,7 @@ function renderIngresos() {
                 <td>${i.numeroFactura || '—'}</td>
                 <td>${cantLineas}</td>
                 <td>${formatPEN(total)}</td>
+                <td>${formatFechaHora(i.creadoEn)}</td>
                 <td class="actions-cell">
                     <button class="btn-small" onclick="verIngreso(${i.id})">Ver</button>
                     <button class="btn-small-danger" onclick="eliminarIngreso(${i.id})">Eliminar</button>
