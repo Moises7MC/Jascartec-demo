@@ -357,11 +357,12 @@ function openModal(id) {
     if (id === 'modalIngreso') {
         ingresoCart = [];
         populateSelectProveedores('#ingProveedor');
-        populateSelectProductos('#ingProducto');
+        $('#ingCategoria').innerHTML = '<option value="">Todas las categorías</option>' +
+            categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+        populateSelectProductosIngreso();
         $('#ingImei').value = '';
         $('#ingCantidad').value = '';
         $('#ingCosto').value = '';
-        toggleCampoImeiIngreso();
         renderIngresoCart();
     }
     if (id === 'modalVenta') {
@@ -451,6 +452,16 @@ function populateSelectProveedores(sel) {
 }
 function populateSelectProductos(sel) {
     $(sel).innerHTML = productos.map(p => `<option value="${p.id}">${nombreProducto(p)}</option>`).join('');
+}
+// El selector de Modelo en Registrar Ingreso se filtra por la Categoría elegida arriba —
+// con muchos tipos de producto mezclados, elegir la categoría primero achica la lista.
+function populateSelectProductosIngreso() {
+    const categoriaId = $('#ingCategoria').value;
+    const lista = categoriaId ? productos.filter(p => p.categoriaId === parseInt(categoriaId)) : productos;
+    $('#ingProducto').innerHTML = lista.length
+        ? lista.map(p => `<option value="${p.id}">${nombreProducto(p)}</option>`).join('')
+        : '<option value="">Sin modelos en esta categoría</option>';
+    toggleCampoImeiIngreso();
 }
 
 // ===================== DASHBOARD =====================
