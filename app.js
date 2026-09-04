@@ -1234,9 +1234,9 @@ function renderVentas() {
         $('#ventasBody').innerHTML = '<tr><td colspan="6" class="empty-state">Aún no hay ventas registradas</td></tr>';
         return;
     }
-    // La tabla muestra TODAS las ventas (incluidas las anuladas, para dejar rastro),
-    // pero los totales/estadísticas de dinero solo cuentan las activas.
-    const lista = [...ventas].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+
+    // Los totales/estadísticas de dinero SIEMPRE cuentan solo las ventas activas,
+    // sin importar qué se esté buscando o filtrando en la tabla de abajo.
     const activas = ventasActivas();
     const totalFacturado = activas.reduce((s, v) => s + ventaTotal(v), 0);
     $('#ventasTotalFacturado').textContent = formatPEN(totalFacturado);
@@ -1248,6 +1248,26 @@ function renderVentas() {
     }));
     const topId = Object.entries(conteoProducto).sort((a, b) => b[1] - a[1])[0]?.[0];
     $('#ventasProductoTop').textContent = topId ? nombreProducto(findProducto(parseInt(topId))) : '—';
+
+    // La tabla sí respeta el buscador y el filtro de estado (Activas/Anuladas/Todas).
+    const busqueda = ($('#venSearch').value || '').trim().toLowerCase();
+    const filtroEstado = $('#venFiltroEstado').value;
+
+    let lista = [...ventas].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+    if (filtroEstado === 'activas') lista = lista.filter(v => !ventaEstaAnulada(v));
+    else if (filtroEstado === 'anuladas') lista = lista.filter(v => ventaEstaAnulada(v));
+
+    if (busqueda) {
+        lista = lista.filter(v => {
+            const texto = `${v.numBoleta} ${v.fecha} ${formatDate(v.fecha)} ${nombreClienteVenta(v)}`.toLowerCase();
+            return texto.includes(busqueda);
+        });
+    }
+
+    if (!lista.length) {
+        $('#ventasBody').innerHTML = '<tr><td colspan="6" class="empty-state">No se encontraron ventas con esos filtros</td></tr>';
+        return;
+    }
 
     $('#ventasBody').innerHTML = lista.map(v => {
         const anulada = ventaEstaAnulada(v);
@@ -1272,6 +1292,8 @@ function renderVentas() {
         `;
     }).join('');
 }
+$('#venSearch').addEventListener('input', renderVentas);
+$('#venFiltroEstado').addEventListener('change', renderVentas);
 
 async function anularVenta(ventaId) {
     const v = ventas.find(x => x.id === ventaId);
