@@ -302,47 +302,95 @@
                         </button>
                     </div>
 
-                    <div class="stats-grid stats-grid--compact">
-                        <div class="stat-card">
-                            <span class="stat-card__label">Total facturado</span>
-                            <span class="stat-card__value" id="ventasTotalFacturado">S/ 0.00</span>
+                    <div class="tabs">
+                        <button type="button" class="tab-btn active" data-ventas-tab="registro" onclick="cambiarTabVentas('registro')">
+                            <i class='bx bx-receipt'></i> Registro
+                        </button>
+                        <button type="button" class="tab-btn" data-ventas-tab="creditos" onclick="cambiarTabVentas('creditos')">
+                            <i class='bx bx-credit-card'></i> Créditos
+                        </button>
+                    </div>
+
+                    <div class="ventas-tab-panel" id="ventasTabRegistro">
+                        <div class="stats-grid stats-grid--compact">
+                            <div class="stat-card">
+                                <span class="stat-card__label">Total facturado</span>
+                                <span class="stat-card__value" id="ventasTotalFacturado">S/ 0.00</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-card__label">Ticket promedio</span>
+                                <span class="stat-card__value" id="ventasTicketProm">S/ 0.00</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-card__label">Modelo top</span>
+                                <span class="stat-card__value stat-card__value--sm" id="ventasProductoTop">—</span>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Ticket promedio</span>
-                            <span class="stat-card__value" id="ventasTicketProm">S/ 0.00</span>
+
+                        <div class="toolbar">
+                            <div class="toolbar__search">
+                                <i class='bx bx-search'></i>
+                                <input type="text" id="venSearch" placeholder="Buscar por N° de boleta, fecha o cliente...">
+                            </div>
+                            <select id="venFiltroEstado">
+                                <option value="activas">Activas</option>
+                                <option value="anuladas">Anuladas</option>
+                                <option value="todas">Todas</option>
+                            </select>
                         </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Modelo top</span>
-                            <span class="stat-card__value stat-card__value--sm" id="ventasProductoTop">—</span>
+
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Boleta</th>
+                                        <th>Fecha</th>
+                                        <th>Cliente</th>
+                                        <th>Equipos</th>
+                                        <th>Total</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ventasBody"></tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div class="toolbar">
-                        <div class="toolbar__search">
-                            <i class='bx bx-search'></i>
-                            <input type="text" id="venSearch" placeholder="Buscar por N° de boleta, fecha o cliente...">
+                    <div class="ventas-tab-panel" id="ventasTabCreditos" style="display:none;">
+                        <div class="stats-grid stats-grid--compact">
+                            <div class="stat-card">
+                                <span class="stat-card__label">Créditos por cobrar</span>
+                                <span class="stat-card__value" id="credTotalPorCobrar">S/ 0.00</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-card__label">Clientes con crédito activo</span>
+                                <span class="stat-card__value" id="credClientesActivos">0</span>
+                            </div>
                         </div>
-                        <select id="venFiltroEstado">
-                            <option value="activas">Activas</option>
-                            <option value="anuladas">Anuladas</option>
-                            <option value="todas">Todas</option>
-                        </select>
-                    </div>
-
-                    <div class="table-wrap">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Boleta</th>
-                                    <th>Fecha</th>
-                                    <th>Cliente</th>
-                                    <th>Equipos</th>
-                                    <th>Total</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ventasBody"></tbody>
-                        </table>
+                        <div class="toolbar">
+                            <div class="toolbar__search">
+                                <i class='bx bx-search'></i>
+                                <input type="text" id="credSearch" placeholder="Buscar por DNI/RUC, nombre o apellido del cliente...">
+                            </div>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Boleta</th>
+                                        <th>Cliente</th>
+                                        <th>Doc.</th>
+                                        <th>Total a pagar</th>
+                                        <th>Pagado</th>
+                                        <th>Pendiente</th>
+                                        <th>Próx. cuota</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="creditosBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
@@ -701,9 +749,26 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group" id="venFechaCreditoWrap" style="display:none;">
-                    <label>Fecha de pago acordada</label>
-                    <input type="date" id="venFechaPagoAcordada">
+                <div id="venCreditoWrap" style="display:none;">
+                    <div class="form-row form-row--credito">
+                        <div class="form-group">
+                            <label>Monto inicial (S/)</label>
+                            <input type="number" id="venMontoInicial" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Frecuencia de pago</label>
+                            <select id="venFrecuencia">
+                                <option value="Semanal">Semanal (máx. 8 cuotas)</option>
+                                <option value="Quincenal">Quincenal (máx. 4 cuotas)</option>
+                                <option value="Mensual">Mensual (máx. 2 cuotas)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>N° de cuotas</label>
+                            <select id="venNumCuotas"></select>
+                        </div>
+                    </div>
+                    <div class="credito-preview" id="venCreditoPreview"></div>
                 </div>
 
                 <div class="form-group">

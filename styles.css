@@ -486,6 +486,23 @@ img {
   background: var(--body-color);
   color: var(--title-color);
 }
+/*=============== TABS (Registro / Créditos en Ventas) ===============*/
+.tabs { display: flex; gap: .5rem; margin-bottom: 1.25rem; border-bottom: 1.5px solid var(--border-color); }
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .7rem 1.1rem;
+  font-size: var(--small-font-size);
+  font-weight: var(--font-medium);
+  color: var(--text-color-light);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1.5px;
+  transition: color .2s, border-color .2s;
+}
+.tab-btn:hover { color: var(--title-color); }
+.tab-btn.active { color: var(--first-color-alt); border-color: var(--first-color); }
+
 .date-filters { display: flex; gap: 1rem; flex-wrap: wrap; }
 .date-filters label { display: flex; flex-direction: column; gap: .3rem; font-size: var(--smaller-font-size); color: var(--text-color-light); }
 .date-filters input {
@@ -807,6 +824,38 @@ img {
 }
 
 .section-subtitle { font-size: var(--normal-font-size); font-weight: var(--font-semi-bold); color: var(--title-color); margin-top: .25rem; }
+
+/*=============== CRÉDITO: monto inicial + recargo + cronograma ===============*/
+.form-row--credito { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 560px) { .form-row--credito { grid-template-columns: 1fr; } }
+
+.credito-preview {
+  background: var(--container-color);
+  border-radius: .75rem;
+  padding: 1rem;
+  margin-top: .9rem;
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+}
+.credito-preview__vacio { font-size: var(--small-font-size); color: var(--text-color-light); text-align: center; padding: .5rem 0; }
+.credito-preview__resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: .75rem 1rem;
+}
+.credito-preview__resumen div { display: flex; flex-direction: column; gap: .15rem; }
+.credito-preview__resumen .label { font-size: var(--smaller-font-size); color: var(--text-color-light); }
+.credito-preview__resumen .value { font-weight: var(--font-semi-bold); color: var(--title-color); font-size: var(--small-font-size); }
+.credito-preview__resumen .value--recargo { color: hsl(30, 80%, 40%); }
+.credito-preview__resumen .value--total { color: var(--first-color-alt); }
+
+.cronograma-table { width: 100%; border-collapse: collapse; font-size: var(--small-font-size); }
+.cronograma-table th, .cronograma-table td { padding: .5rem .6rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+.cronograma-table th { color: var(--text-color-light); font-weight: var(--font-medium); font-size: var(--smaller-font-size); }
+.cronograma-table tr:last-child td { border-bottom: none; }
+.cronograma-table .cuota-pagada { color: var(--success-color); font-weight: var(--font-medium); }
+.cronograma-table .cuota-pendiente { color: var(--text-color-light); }
 
 .detalle-grid {
   display: grid;

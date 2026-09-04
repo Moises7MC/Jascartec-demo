@@ -3,6 +3,7 @@ using System;
 using Jascartec.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Jascartec.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(JascartecDbContext))]
-    partial class JascartecDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260904040802_AgregarCreditoConCronograma")]
+    partial class AgregarCreditoConCronograma
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -600,12 +603,6 @@ namespace Jascartec.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<bool>("Activo")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("activo");
-
                     b.Property<int>("EquipoId")
                         .HasColumnType("integer")
                         .HasColumnName("equipo_id");
@@ -621,8 +618,7 @@ namespace Jascartec.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EquipoId")
-                        .IsUnique()
-                        .HasFilter("activo = true");
+                        .IsUnique();
 
                     b.HasIndex("VentaId");
 
@@ -729,8 +725,8 @@ namespace Jascartec.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Jascartec.Domain.Entities.VentaItem", b =>
                 {
                     b.HasOne("Jascartec.Domain.Entities.Equipo", "Equipo")
-                        .WithMany("VentaItems")
-                        .HasForeignKey("EquipoId")
+                        .WithOne("VentaItem")
+                        .HasForeignKey("Jascartec.Domain.Entities.VentaItem", "EquipoId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -752,7 +748,7 @@ namespace Jascartec.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Jascartec.Domain.Entities.Equipo", b =>
                 {
-                    b.Navigation("VentaItems");
+                    b.Navigation("VentaItem");
                 });
 
             modelBuilder.Entity("Jascartec.Domain.Entities.Factura", b =>

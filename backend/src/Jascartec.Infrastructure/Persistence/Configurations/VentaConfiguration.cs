@@ -28,6 +28,11 @@ public class VentaConfiguration : IEntityTypeConfiguration<Venta>
             .HasDefaultValue(EstadoBoleta.Activa);
         b.Property(x => x.FechaAnulacion).HasColumnName("fecha_anulacion");
 
+        b.Property(x => x.MontoInicial).HasColumnName("monto_inicial").HasColumnType("numeric(10,2)");
+        b.Property(x => x.Recargo).HasColumnName("recargo").HasColumnType("numeric(10,2)").HasDefaultValue(0m);
+        b.Property(x => x.FrecuenciaPago).HasColumnName("frecuencia_pago").HasConversion<string>().HasMaxLength(10);
+        b.Property(x => x.NumCuotas).HasColumnName("num_cuotas");
+
         b.HasOne(x => x.Cliente).WithMany(c => c.Ventas).HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.SetNull);
         b.Ignore(x => x.Total);
         b.Ignore(x => x.MontoPagado);

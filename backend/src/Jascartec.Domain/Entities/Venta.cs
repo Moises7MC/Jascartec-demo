@@ -14,11 +14,17 @@ public class Venta
     public EstadoBoleta Estado { get; set; } = EstadoBoleta.Activa;
     public DateOnly? FechaAnulacion { get; set; }
 
+    // Solo aplican a ventas a crédito (FormaPago = Credito).
+    public decimal? MontoInicial { get; set; }
+    public decimal Recargo { get; set; } // cargo financiero aparte del precio del equipo; 0 en Contado
+    public FrecuenciaPago? FrecuenciaPago { get; set; }
+    public int? NumCuotas { get; set; }
+
     public Cliente? Cliente { get; set; }
     public ICollection<VentaItem> Items { get; set; } = new List<VentaItem>();
     public ICollection<Abono> Abonos { get; set; } = new List<Abono>();
 
     public decimal Total => Items.Sum(i => i.PrecioUnit);
     public decimal MontoPagado => FormaPago == FormaPago.Contado ? Total : Abonos.Sum(a => a.Monto);
-    public decimal SaldoPendiente => Total - MontoPagado;
+    public decimal SaldoPendiente => (Total + Recargo) - MontoPagado;
 }

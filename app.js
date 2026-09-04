@@ -309,6 +309,7 @@ function renderAll() {
     renderInventario();
     renderIngresos();
     renderVentas();
+    renderCreditos();
     renderFlujoCaja();
     renderProductos();
     renderProveedores();
@@ -354,7 +355,8 @@ function openModal(id) {
         ventaEquiposDisponiblesCache = [];
         seleccionarClienteVenta(null);
         $('#venFormaPago').value = 'Contado';
-        $('#venFechaPagoAcordada').value = '';
+        $('#venMontoInicial').value = '';
+        $('#venFrecuencia').value = 'Semanal';
         toggleCampoCredito();
         actualizarTriggerModelo();
         $('#venEquipoSel').innerHTML = '';
@@ -929,11 +931,97 @@ let ventaCart = [];
 let venModeloSeleccionado = null; // productoId elegido en el selector visual
 let ventaEquiposDisponiblesCache = []; // último resultado de /equipos/disponibles para el modelo elegido
 
+// Reglas de negocio del crédito, calculadas también acá para que el vendedor vea
+// el cronograma al instante mientras arma la venta — el backend recalcula y guarda
+// la versión oficial al confirmar, así que ambos lados deben coincidir exactamente.
+const FREC_MAX_CUOTAS = { Semanal: 8, Quincenal: 4, Mensual: 2 }; // topado a 2 meses
+const FREC_INTERVALO_DIAS = { Semanal: 7, Quincenal: 15, Mensual: 30 };
+
+function calcularRecargoCredito(montoInicial, total) {
+    if (total <= 0) return 0;
+    const inicialAlto = (montoInicial / total) >= 0.5;
+    const precioAlto = total >= 1000;
+    if (inicialAlto) return precioAlto ? 100 : 50;
+    return precioAlto ? 200 : 100;
+}
+
+function calcularPlanCuotasPreview(frecuencia, numCuotas, montoAFinanciar) {
+    const intervalo = FREC_INTERVALO_DIAS[frecuencia];
+    const cuotaBase = Math.round((montoAFinanciar / numCuotas) * 100) / 100;
+    const fechaBase = new Date(today() + 'T00:00:00');
+    const cuotas = [];
+    let acumulado = 0;
+    for (let i = 1; i <= numCuotas; i++) {
+        const monto = i < numCuotas ? cuotaBase : Math.round((montoAFinanciar - acumulado) * 100) / 100;
+        acumulado += monto;
+        const fecha = new Date(fechaBase);
+        fecha.setDate(fecha.getDate() + intervalo * i);
+        cuotas.push({ numero: i, monto, fecha: fechaLocalISO(fecha) });
+    }
+    return cuotas;
+}
+
 function toggleCampoCredito() {
     const esCredito = $('#venFormaPago').value === 'Crédito';
-    $('#venFechaCreditoWrap').style.display = esCredito ? '' : 'none';
-    $('#venFechaPagoAcordada').required = esCredito;
+    $('#venCreditoWrap').style.display = esCredito ? '' : 'none';
+    if (esCredito) {
+        actualizarNumCuotasOptions();
+        actualizarPreviewCredito();
+    }
 }
+
+function actualizarNumCuotasOptions() {
+    const frecuencia = $('#venFrecuencia').value;
+    const max = FREC_MAX_CUOTAS[frecuencia] || 1;
+    const actual = parseInt($('#venNumCuotas').value) || 0;
+    $('#venNumCuotas').innerHTML = Array.from({ length: max }, (_, i) => i + 1)
+        .map(n => `<option value="${n}">${n} cuota${n === 1 ? '' : 's'} (${frecuencia.toLowerCase()})</option>`).join('');
+    $('#venNumCuotas').value = (actual >= 1 && actual <= max) ? actual : max;
+}
+
+function actualizarPreviewCredito() {
+    const total = ventaCart.reduce((s, it) => s + it.precioUnit, 0);
+    const montoInicial = parseFloat($('#venMontoInicial').value);
+    const frecuencia = $('#venFrecuencia').value;
+    const numCuotas = parseInt($('#venNumCuotas').value);
+    const preview = $('#venCreditoPreview');
+
+    if (!total) {
+        preview.innerHTML = '<div class="credito-preview__vacio">Agregue equipos al carrito para calcular el crédito</div>';
+        return;
+    }
+    if (isNaN(montoInicial) || montoInicial < 0 || montoInicial >= total) {
+        preview.innerHTML = `<div class="credito-preview__vacio">Ingrese un monto inicial válido (menor a ${formatPEN(total)})</div>`;
+        return;
+    }
+    if (!numCuotas) {
+        preview.innerHTML = '<div class="credito-preview__vacio">Seleccione el número de cuotas</div>';
+        return;
+    }
+
+    const recargo = calcularRecargoCredito(montoInicial, total);
+    const montoAFinanciar = (total - montoInicial) + recargo;
+    const cuotas = calcularPlanCuotasPreview(frecuencia, numCuotas, montoAFinanciar);
+    const porcentajeInicial = (montoInicial / total) * 100;
+
+    preview.innerHTML = `
+        <div class="credito-preview__resumen">
+            <div><span class="label">Inicial</span><span class="value">${formatPEN(montoInicial)} (${porcentajeInicial.toFixed(0)}%)</span></div>
+            <div><span class="label">Recargo aplicado</span><span class="value value--recargo">${formatPEN(recargo)}</span></div>
+            <div><span class="label">Monto a financiar</span><span class="value">${formatPEN(montoAFinanciar)}</span></div>
+            <div><span class="label">Total a pagar</span><span class="value value--total">${formatPEN(total + recargo)}</span></div>
+        </div>
+        <table class="cronograma-table">
+            <thead><tr><th>Cuota</th><th>Fecha</th><th>Monto</th></tr></thead>
+            <tbody>
+                ${cuotas.map(c => `<tr><td>${c.numero}</td><td>${formatDate(c.fecha)}</td><td>${formatPEN(c.monto)}</td></tr>`).join('')}
+            </tbody>
+        </table>
+    `;
+}
+$('#venMontoInicial').addEventListener('input', actualizarPreviewCredito);
+$('#venFrecuencia').addEventListener('change', () => { actualizarNumCuotasOptions(); actualizarPreviewCredito(); });
+$('#venNumCuotas').addEventListener('change', actualizarPreviewCredito);
 
 // ---------- Buscador de cliente (autocompletar) ----------
 // Reemplaza el <select> simple: con muchos clientes registrados, escribir y
@@ -1106,6 +1194,7 @@ function renderVentaCart() {
     `).join('');
     const total = ventaCart.reduce((s, it) => s + it.precioUnit, 0);
     $('#ventaResumen').textContent = `${ventaCart.length} equipo(s) · Total: ${formatPEN(total)}`;
+    if ($('#venFormaPago').value === 'Crédito') actualizarPreviewCredito();
 }
 
 async function confirmarVenta() {
@@ -1114,15 +1203,25 @@ async function confirmarVenta() {
     if (!ventaCart.length) { toast('✗ Agregue al menos un equipo', 'error'); return; }
 
     const formaPago = $('#venFormaPago').value;
-    const fechaPagoAcordada = $('#venFechaPagoAcordada').value || null;
+    const payload = { clienteId, items: ventaCart.map(it => ({ equipoId: it.equipoId })), formaPago };
+
+    if (formaPago === 'Crédito') {
+        if (!clienteId) { toast('✗ Para venta a crédito debe seleccionar un cliente registrado', 'error'); return; }
+
+        const total = ventaCart.reduce((s, it) => s + it.precioUnit, 0);
+        const montoInicial = parseFloat($('#venMontoInicial').value);
+        const numCuotas = parseInt($('#venNumCuotas').value);
+        if (isNaN(montoInicial) || montoInicial < 0) { toast('✗ Ingrese el monto inicial', 'error'); return; }
+        if (montoInicial >= total) { toast('✗ El monto inicial debe ser menor al total de la venta', 'error'); return; }
+        if (!numCuotas) { toast('✗ Seleccione el número de cuotas', 'error'); return; }
+
+        payload.montoInicial = montoInicial;
+        payload.frecuenciaPago = $('#venFrecuencia').value;
+        payload.numCuotas = numCuotas;
+    }
 
     try {
-        const nuevaVenta = await api.post('/ventas', {
-            clienteId,
-            items: ventaCart.map(it => ({ equipoId: it.equipoId })),
-            formaPago,
-            fechaPagoAcordada
-        });
+        const nuevaVenta = await api.post('/ventas', payload);
 
         toast(`✓ Venta ${nuevaVenta.numBoleta} registrada: ${formatPEN(ventaTotal(nuevaVenta))}`, 'success');
         closeModal('modalVenta');
@@ -1190,6 +1289,7 @@ function abrirGestionPago(ventaId) {
     const v = ventas.find(x => x.id === ventaId);
     if (!v) return;
     const total = ventaTotal(v);
+    const recargo = v.recargo || 0;
     const pagado = ventaMontoPagado(v);
     const saldo = ventaSaldoPendiente(v);
     const { tag, texto } = tagFormaPago(v);
@@ -1202,17 +1302,37 @@ function abrirGestionPago(ventaId) {
             </div>`).join('')
         : '<div class="empty-state">Aún no ha registrado abonos</div>';
 
+    const cronogramaHtml = (v.cuotas || []).length ? `
+        <h4 class="section-subtitle">Cronograma de pagos${v.frecuenciaPago ? ` (${v.frecuenciaPago.toLowerCase()})` : ''}</h4>
+        <table class="cronograma-table" style="margin-bottom:1.25rem;">
+            <thead><tr><th>Cuota</th><th>Vencimiento</th><th>Monto</th><th>Estado</th></tr></thead>
+            <tbody>
+                ${v.cuotas.map(c => `
+                    <tr>
+                        <td>${c.numero}</td>
+                        <td>${formatDate(c.fechaVencimiento)}</td>
+                        <td>${formatPEN(c.monto)}</td>
+                        <td class="${c.pagada ? 'cuota-pagada' : 'cuota-pendiente'}">${c.pagada ? '✓ Pagada' : 'Pendiente'}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    ` : '';
+
     $('#modalGestionPagoTitle').textContent = `Pago — ${v.numBoleta}`;
     $('#gestionPagoContent').innerHTML = `
         <div class="detalle-grid">
             <div><div class="label">Cliente</div><div class="value">${nombreClienteVenta(v)}</div></div>
             <div><div class="label">Fecha de venta</div><div class="value">${formatDateLong(v.fecha)}</div></div>
-            <div><div class="label">Total</div><div class="value">${formatPEN(total)}</div></div>
-            <div><div class="label">Fecha acordada</div><div class="value">${formatDateLong(v.fechaPagoAcordada)}</div></div>
+            <div><div class="label">Total equipo</div><div class="value">${formatPEN(total)}</div></div>
+            ${recargo > 0 ? `<div><div class="label">Recargo por crédito</div><div class="value">${formatPEN(recargo)}</div></div>` : ''}
+            <div><div class="label">Total a pagar</div><div class="value">${formatPEN(total + recargo)}</div></div>
+            <div><div class="label">Última cuota</div><div class="value">${formatDateLong(v.fechaPagoAcordada)}</div></div>
             <div><div class="label">Pagado</div><div class="value">${formatPEN(pagado)}</div></div>
             <div><div class="label">Saldo pendiente</div><div class="value">${formatPEN(saldo)}</div></div>
         </div>
         <span class="tag ${tag}" style="margin:0.85rem 0; display:inline-block;">${texto}</span>
+        ${cronogramaHtml}
         <h4 class="section-subtitle">Historial de abonos</h4>
         <div class="list-modal" style="margin-bottom:1.25rem;">${abonosHtml}</div>
         ${saldo > 0.01 ? `
@@ -1328,6 +1448,59 @@ async function anularVenta(ventaId) {
         toast(`✗ ${err.message}`, 'error');
     }
 }
+
+// ---------- Tab "Créditos": buscar y cobrar ventas a crédito por DNI/nombre ----------
+function cambiarTabVentas(tab) {
+    $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.ventasTab === tab));
+    $('#ventasTabRegistro').style.display = tab === 'registro' ? '' : 'none';
+    $('#ventasTabCreditos').style.display = tab === 'creditos' ? '' : 'none';
+    if (tab === 'creditos') renderCreditos();
+}
+
+function renderCreditos() {
+    const creditos = ventasActivas().filter(v => v.formaPago === 'Crédito');
+
+    const totalPorCobrar = creditos.reduce((s, v) => s + ventaSaldoPendiente(v), 0);
+    $('#credTotalPorCobrar').textContent = formatPEN(totalPorCobrar);
+    const clientesActivos = new Set(creditos.filter(v => !ventaEstaPagada(v)).map(v => v.clienteId)).size;
+    $('#credClientesActivos').textContent = clientesActivos;
+
+    const busqueda = ($('#credSearch').value || '').trim().toLowerCase();
+    let lista = [...creditos].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+    if (busqueda) {
+        lista = lista.filter(v => `${nombreClienteVenta(v)} ${v.clienteDocumento || ''}`.toLowerCase().includes(busqueda));
+    }
+
+    if (!lista.length) {
+        $('#creditosBody').innerHTML = `<tr><td colspan="9" class="empty-state">${busqueda ? 'No se encontraron créditos con esa búsqueda' : 'Aún no hay ventas a crédito registradas'}</td></tr>`;
+        return;
+    }
+
+    $('#creditosBody').innerHTML = lista.map(v => {
+        const totalAPagar = ventaTotal(v) + (v.recargo || 0);
+        const pagado = ventaMontoPagado(v);
+        const saldo = ventaSaldoPendiente(v);
+        const { tag, texto } = tagFormaPago(v);
+        const proximaCuota = (v.cuotas || []).find(c => !c.pagada);
+        return `
+            <tr>
+                <td><strong>${v.numBoleta}</strong></td>
+                <td>${nombreClienteVenta(v)}</td>
+                <td>${v.clienteDocumento || '—'}</td>
+                <td>${formatPEN(totalAPagar)}</td>
+                <td>${formatPEN(pagado)}</td>
+                <td>${formatPEN(saldo)}</td>
+                <td>${proximaCuota ? formatDate(proximaCuota.fechaVencimiento) : '—'}</td>
+                <td><span class="tag ${tag}">${texto}</span></td>
+                <td class="actions-cell">
+                    <button class="btn-small" onclick="verBoleta(${v.id})">Ver</button>
+                    <button class="btn-small${ventaEstaPagada(v) ? '' : '-danger'}" onclick="abrirGestionPago(${v.id})">${ventaEstaPagada(v) ? 'Pagado' : 'Gestionar pago'}</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+$('#credSearch').addEventListener('input', renderCreditos);
 
 // ===================== FLUJO DE CAJA =====================
 function calcularMovimientosCaja(desde, hasta) {

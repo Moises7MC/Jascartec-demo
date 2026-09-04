@@ -18,5 +18,8 @@ public class Equipo
     public Producto Producto { get; set; } = null!;
     public Proveedor? Proveedor { get; set; }
     public Ingreso? Ingreso { get; set; }
-    public VentaItem? VentaItem { get; set; }
+
+    // Historial de veces que este equipo fue incluido en una venta; puede tener más de una
+    // fila si una venta anterior fue anulada y el equipo se volvió a vender después.
+    public ICollection<VentaItem> VentaItems { get; set; } = new List<VentaItem>();
 }
