@@ -665,7 +665,17 @@
                     <div class="form-group">
                         <label>Cliente</label>
                         <div class="field-with-btn">
-                            <select id="venCliente"></select>
+                            <div class="cliente-combo" id="venClienteCombo">
+                                <div class="cliente-combo__input-wrap">
+                                    <i class='bx bx-search'></i>
+                                    <input type="text" id="venClienteBuscar" placeholder="Cliente varios (sin registrar) — buscar por nombre o documento..." autocomplete="off">
+                                    <button type="button" class="cliente-combo__clear" id="venClienteClear" onclick="limpiarClienteVenta()" title="Quitar selección" style="display:none;">
+                                        <i class='bx bx-x'></i>
+                                    </button>
+                                </div>
+                                <input type="hidden" id="venClienteId" value="">
+                                <div class="cliente-combo__lista" id="venClienteLista"></div>
+                            </div>
                             <button type="button" class="btn-small-outline" onclick="abrirNuevoClienteDesdeVenta()" title="Registrar un cliente nuevo sin salir de la venta">
                                 <i class='bx bx-user-plus'></i> Nuevo
                             </button>

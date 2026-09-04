@@ -338,7 +338,7 @@ function openModal(id) {
         ventaCart = [];
         venModeloSeleccionado = null;
         ventaEquiposDisponiblesCache = [];
-        populateSelectClientes('#venCliente');
+        seleccionarClienteVenta(null);
         $('#venFormaPago').value = 'Contado';
         $('#venFechaPagoAcordada').value = '';
         toggleCampoCredito();
@@ -400,10 +400,6 @@ function populateSelectMarcasProducto() {
 }
 function populateSelectProveedores(sel) {
     $(sel).innerHTML = proveedores.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-}
-function populateSelectClientes(sel) {
-    const opcionVarios = '<option value="">Cliente varios (sin registrar)</option>';
-    $(sel).innerHTML = opcionVarios + clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
 }
 function populateSelectProductos(sel) {
     $(sel).innerHTML = productos.map(p => `<option value="${p.id}">${nombreProducto(p)}</option>`).join('');
@@ -925,6 +921,76 @@ function toggleCampoCredito() {
     $('#venFechaPagoAcordada').required = esCredito;
 }
 
+// ---------- Buscador de cliente (autocompletar) ----------
+// Reemplaza el <select> simple: con muchos clientes registrados, escribir y
+// filtrar es mucho más rápido que desplazarse por una lista larga.
+function seleccionarClienteVenta(clienteId) {
+    const c = clienteId ? findCliente(clienteId) : null;
+    $('#venClienteId').value = c ? c.id : '';
+    $('#venClienteBuscar').value = c ? c.nombre : '';
+    $('#venClienteClear').style.display = c ? '' : 'none';
+    cerrarListaClientesVenta();
+}
+
+function limpiarClienteVenta() {
+    seleccionarClienteVenta(null);
+    $('#venClienteBuscar').focus();
+}
+
+function renderListaClientesVenta() {
+    const termino = ($('#venClienteBuscar').value || '').trim().toLowerCase();
+    const filas = [];
+
+    if (!termino || 'cliente varios'.includes(termino)) {
+        filas.push(`
+            <div class="cliente-combo__item cliente-combo__item--varios" onclick="seleccionarClienteVenta(null)">
+                <i class='bx bx-user-x'></i> Cliente varios (sin registrar)
+            </div>
+        `);
+    }
+
+    clientes
+        .filter(c => c.nombre.toLowerCase().includes(termino) || c.documento.toLowerCase().includes(termino))
+        .slice(0, 30)
+        .forEach(c => {
+            filas.push(`
+                <div class="cliente-combo__item" onclick="seleccionarClienteVenta(${c.id})">
+                    <div class="cliente-combo__item-nombre">${c.nombre}</div>
+                    <div class="cliente-combo__item-doc">🪪 ${c.documento} · ${c.tipo}</div>
+                </div>
+            `);
+        });
+
+    if (!filas.length) {
+        filas.push('<div class="cliente-combo__vacio">No se encontraron clientes con ese nombre o documento</div>');
+    }
+    $('#venClienteLista').innerHTML = filas.join('');
+}
+
+function abrirListaClientesVenta() {
+    renderListaClientesVenta();
+    $('#venClienteCombo').classList.add('abierto');
+}
+function cerrarListaClientesVenta() {
+    $('#venClienteCombo').classList.remove('abierto');
+}
+
+$('#venClienteBuscar').addEventListener('input', () => {
+    // Al volver a escribir se invalida la selección previa, hasta elegir algo de la lista.
+    $('#venClienteId').value = '';
+    $('#venClienteClear').style.display = 'none';
+    abrirListaClientesVenta();
+});
+$('#venClienteBuscar').addEventListener('focus', abrirListaClientesVenta);
+document.addEventListener('click', (e) => {
+    const combo = $('#venClienteCombo');
+    if (combo && !combo.contains(e.target)) {
+        cerrarListaClientesVenta();
+        // Si quedó texto escrito sin elegir nada de la lista, se descarta (vuelve a "Cliente varios").
+        if (!$('#venClienteId').value) $('#venClienteBuscar').value = '';
+    }
+});
+
 // ---------- Selector visual de modelo (elegir por foto) ----------
 function abrirSelectorModelo() {
     openModal('modalSelectorModelo');
@@ -1029,7 +1095,7 @@ function renderVentaCart() {
 }
 
 async function confirmarVenta() {
-    const clienteIdRaw = $('#venCliente').value;
+    const clienteIdRaw = $('#venClienteId').value;
     const clienteId = clienteIdRaw ? parseInt(clienteIdRaw) : null;
     if (!ventaCart.length) { toast('✗ Agregue al menos un equipo', 'error'); return; }
 
@@ -1496,8 +1562,7 @@ $('#formCliente').addEventListener('submit', async (e) => {
 
         if (clienteVinoDesdeVenta) {
             // Volvemos a la venta con el cliente recién creado ya seleccionado, sin perder el carrito.
-            populateSelectClientes('#venCliente');
-            $('#venCliente').value = clienteGuardado.id;
+            seleccionarClienteVenta(clienteGuardado.id);
             clienteVinoDesdeVenta = false;
         }
     } catch (err) {

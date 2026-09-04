@@ -734,6 +734,66 @@ img {
 .dni-lookup-msg--warn { color: hsl(38, 92%, 40%); }
 .dni-lookup-msg--info { color: var(--text-color-light); }
 
+/* ===== Buscador de cliente (autocompletar) en Registrar Venta ===== */
+.field-with-btn .cliente-combo { flex: 1; min-width: 0; position: relative; }
+
+.cliente-combo__input-wrap {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: .6rem;
+  padding-inline: .9rem;
+  transition: border-color .2s, box-shadow .2s;
+}
+.cliente-combo__input-wrap:focus-within {
+  border-color: var(--first-color);
+  box-shadow: 0 0 0 3px hsla(var(--hue), 92%, 50%, .15);
+}
+.cliente-combo__input-wrap i { color: var(--text-color-light); flex-shrink: 0; }
+.cliente-combo__input-wrap input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: .7rem 0;
+  color: var(--title-color);
+}
+.cliente-combo__input-wrap input:focus { outline: none; }
+.cliente-combo__clear {
+  flex-shrink: 0;
+  display: flex;
+  color: var(--text-color-light);
+  padding: .25rem;
+  border-radius: 50%;
+  transition: background .2s, color .2s;
+}
+.cliente-combo__clear:hover { background: var(--container-color); color: var(--error-color); }
+
+.cliente-combo__lista {
+  display: none;
+  position: absolute;
+  top: calc(100% + .4rem);
+  left: 0;
+  right: 0;
+  background: var(--body-color);
+  border: 1px solid var(--border-color);
+  border-radius: .6rem;
+  box-shadow: 0 12px 28px hsla(0, 0%, 0%, .16);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 5;
+}
+.cliente-combo.abierto .cliente-combo__lista { display: block; }
+
+.cliente-combo__item { padding: .65rem .9rem; cursor: pointer; border-bottom: 1px solid var(--border-color); }
+.cliente-combo__item:last-child { border-bottom: none; }
+.cliente-combo__item:hover { background: var(--first-color-light); }
+.cliente-combo__item--varios { display: flex; align-items: center; gap: .5rem; color: var(--text-color); font-weight: var(--font-medium); }
+.cliente-combo__item-nombre { font-size: var(--small-font-size); color: var(--title-color); font-weight: var(--font-medium); }
+.cliente-combo__item-doc { font-size: var(--smaller-font-size); color: var(--text-color-light); margin-top: .1rem; }
+.cliente-combo__vacio { padding: .85rem .9rem; font-size: var(--small-font-size); color: var(--text-color-light); text-align: center; }
+
 .inline-form { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; }
 .inline-form .form-group { flex: 1; min-width: 140px; }
 
