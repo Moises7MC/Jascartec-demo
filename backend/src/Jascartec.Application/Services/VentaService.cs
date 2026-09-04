@@ -38,7 +38,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         var venta = new Venta
         {
             NumBoleta = await unitOfWork.Ventas.GenerarSiguienteNumBoletaAsync(ct),
-            Fecha = DateOnly.FromDateTime(DateTime.UtcNow),
+            Fecha = RelojNegocio.HoyPeru(),
             ClienteId = request.ClienteId,
             FormaPago = formaPago,
             FechaPagoAcordada = formaPago == FormaPago.Credito ? request.FechaPagoAcordada : null,
@@ -112,7 +112,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         }
 
         venta.Estado = EstadoBoleta.Anulada;
-        venta.FechaAnulacion = DateOnly.FromDateTime(DateTime.UtcNow);
+        venta.FechaAnulacion = RelojNegocio.HoyPeru();
         await unitOfWork.SaveChangesAsync(ct);
 
         return await ObtenerAsync(id, ct);
@@ -137,6 +137,6 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             v.Cliente?.Nombre ?? "Cliente varios (sin registrar)", v.Cliente?.Documento, v.Cliente?.Direccion,
             v.FormaPago == FormaPago.Credito ? "Crédito" : "Contado", v.FechaPagoAcordada,
             items, abonos, v.Total, v.MontoPagado, v.SaldoPendiente,
-            v.Estado.ToString(), v.FechaAnulacion);
+            v.Estado.ToString(), v.FechaAnulacion, v.CreadoEn);
     }
 }

@@ -24,7 +24,21 @@ const formatDateLong = (str) => {
     const d = new Date(str + 'T00:00:00');
     return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
-const today = () => new Date().toISOString().split('T')[0];
+// Fecha en formato YYYY-MM-DD usando la hora LOCAL del navegador — nunca la de
+// Date#toISOString(), que primero convierte a UTC: de noche en Perú (UTC-5)
+// eso hacía que una venta hecha a las 9pm quedara fechada "mañana".
+const fechaLocalISO = (date = new Date()) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+const today = () => fechaLocalISO();
+// Hora (HH:MM) de una marca de tiempo (creadoEn de la API), en la hora local
+// del navegador — igual de importante para no confundir "hora de la venta".
+const formatHora = (isoDateTime) => isoDateTime
+    ? new Date(isoDateTime).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : '';
 
 // ===================== ESTADO GLOBAL (llenado desde la API) =====================
 let negocio = { razonSocial: '', ruc: '', direccion: '', telefono: '', email: '', web: '' };
@@ -435,7 +449,7 @@ function initCharts() {
     for (let i = 13; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        dias.push(d.toISOString().split('T')[0]);
+        dias.push(fechaLocalISO(d));
     }
     const ventasPorDia = dias.map(d => ventasActivas().filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
 
@@ -484,7 +498,7 @@ function updateCharts() {
     for (let i = 13; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        dias.push(d.toISOString().split('T')[0]);
+        dias.push(fechaLocalISO(d));
     }
     chartVentas.data.datasets[0].data = dias.map(d => ventas.filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
     chartVentas.update();
@@ -1275,7 +1289,7 @@ function renderVentas() {
         return `
             <tr style="${anulada ? 'opacity:.55;' : ''}">
                 <td><strong style="${anulada ? 'text-decoration:line-through;' : ''}">${v.numBoleta}</strong></td>
-                <td>${formatDate(v.fecha)}</td>
+                <td>${formatDate(v.fecha)} <small class="muted">${formatHora(v.creadoEn)}</small></td>
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.items.length}</td>
                 <td>${formatPEN(ventaTotal(v))}</td>
@@ -1357,7 +1371,7 @@ function calcularMovimientosCaja(desde, hasta) {
 function renderFlujoCaja() {
     if (!$('#cajaDesde').value) {
         const hoy = new Date(today() + 'T00:00:00');
-        $('#cajaDesde').value = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+        $('#cajaDesde').value = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
     }
     if (!$('#cajaHasta').value) $('#cajaHasta').value = today();
 
@@ -1392,7 +1406,7 @@ function renderChartFlujoCaja() {
     for (let i = 5; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
-        meses.push(d.toISOString().slice(0, 7));
+        meses.push(fechaLocalISO(d).slice(0, 7));
     }
     const movimientos = calcularMovimientosCaja(null, null);
     const entradasPorMes = meses.map(m => movimientos.filter(x => x.fecha.startsWith(m) && x.tipo === 'Entrada').reduce((s, x) => s + x.monto, 0));
@@ -1656,7 +1670,7 @@ function generarLetras() {
     for (let i = 1; i <= numLetras; i++) {
         const fechaLetra = new Date(fechaBase + 'T00:00:00');
         fechaLetra.setMonth(fechaLetra.getMonth() + i);
-        const fechaStr = fechaLetra.toISOString().split('T')[0];
+        const fechaStr = fechaLocalISO(fechaLetra);
         filas += `
             <tr>
                 <td>#${i}</td>
@@ -1906,7 +1920,7 @@ function exportBackup() {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const fecha = new Date().toISOString().split('T')[0];
+    const fecha = today();
     a.href = url;
     a.download = `jascartec_respaldo_${fecha}.json`;
     document.body.appendChild(a);

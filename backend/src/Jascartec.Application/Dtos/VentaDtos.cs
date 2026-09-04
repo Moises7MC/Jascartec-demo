@@ -9,7 +9,7 @@ public record VentaDto(
     string? ClienteDireccion, string FormaPago, DateOnly? FechaPagoAcordada,
     IReadOnlyList<VentaItemDto> Items, IReadOnlyList<AbonoDto> Abonos,
     decimal Total, decimal MontoPagado, decimal SaldoPendiente,
-    string Estado, DateOnly? FechaAnulacion);
+    string Estado, DateOnly? FechaAnulacion, DateTimeOffset CreadoEn);
 
 /// <summary>El vendedor elige el IMEI puntual en el carrito (GET /api/equipos/disponibles), no solo el modelo.</summary>
 public record CrearVentaItemRequest(int EquipoId);

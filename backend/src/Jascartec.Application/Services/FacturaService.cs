@@ -57,7 +57,7 @@ public class FacturaService(IUnitOfWork unitOfWork) : IFacturaService
             ?? throw new NotFoundException("Letra", numeroLetra);
 
         letra.Pagada = !letra.Pagada;
-        letra.FechaPago = letra.Pagada ? DateOnly.FromDateTime(DateTime.UtcNow) : null;
+        letra.FechaPago = letra.Pagada ? RelojNegocio.HoyPeru() : null;
 
         await unitOfWork.SaveChangesAsync(ct);
         return ToDto(factura);
