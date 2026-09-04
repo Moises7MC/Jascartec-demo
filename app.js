@@ -88,13 +88,23 @@ function colorPorMarca(marca) {
 }
 function placeholderImagenProducto(producto) {
     const color = colorPorMarca(producto.marca);
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-        <rect width="200" height="200" rx="24" fill="#eef1f5"/>
-        <rect x="72" y="32" width="56" height="136" rx="13" fill="${color}"/>
-        <rect x="78" y="45" width="44" height="98" rx="4" fill="#ffffff" opacity="0.14"/>
-        <circle cx="100" cy="155" r="4" fill="#ffffff" opacity="0.55"/>
-        <circle cx="112" cy="40" r="2.5" fill="#ffffff" opacity="0.4"/>
-    </svg>`;
+    // Celulares (o compatibilidad con datos viejos sin el campo): silueta de celular.
+    // El resto de categorías (accesorios, impresoras, etc.) usa un ícono de caja genérico,
+    // para no mostrar un celular donde no corresponde.
+    const svg = producto.requiereImei !== false ? `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+            <rect width="200" height="200" rx="24" fill="#eef1f5"/>
+            <rect x="72" y="32" width="56" height="136" rx="13" fill="${color}"/>
+            <rect x="78" y="45" width="44" height="98" rx="4" fill="#ffffff" opacity="0.14"/>
+            <circle cx="100" cy="155" r="4" fill="#ffffff" opacity="0.55"/>
+            <circle cx="112" cy="40" r="2.5" fill="#ffffff" opacity="0.4"/>
+        </svg>` : `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+            <rect width="200" height="200" rx="24" fill="#eef1f5"/>
+            <polygon points="60,68 100,48 140,68 100,88" fill="${color}"/>
+            <polygon points="60,68 100,88 100,148 60,128" fill="${color}" opacity="0.75"/>
+            <polygon points="140,68 100,88 100,148 140,128" fill="${color}" opacity="0.55"/>
+        </svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 const productoImagenSrc = (p) => (p && p.imagenUrl) ? p.imagenUrl : placeholderImagenProducto(p || { marca: '' });
@@ -750,18 +760,29 @@ function populateFiltroMarcaCatalogo() {
     sel.innerHTML = '<option value="">Todas</option>' + marcas.map(m => `<option value="${m.nombre}">${m.nombre}</option>`).join('');
     sel.value = actual;
 }
+function populateFiltroCategoriaCatalogo() {
+    const sel = $('#catFiltroCategoria');
+    const actual = sel.value;
+    sel.innerHTML = '<option value="">Todas</option>' + categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+    sel.value = actual;
+}
 
 function renderProductos() {
     populateFiltroMarcaCatalogo();
+    populateFiltroCategoriaCatalogo();
 
     const busqueda = ($('#catSearch').value || '').toLowerCase();
+    const categoriaFiltro = $('#catFiltroCategoria').value;
     const marcaFiltro = $('#catFiltroMarca').value;
     const gamaFiltro = $('#catFiltroGama').value;
     const orden = $('#catOrden').value;
 
     let lista = productos.filter(p => {
         const texto = `${nombreProducto(p)} ${p.codigo}`.toLowerCase();
-        return texto.includes(busqueda) && (!marcaFiltro || p.marca === marcaFiltro) && (!gamaFiltro || p.gama === gamaFiltro);
+        return texto.includes(busqueda)
+            && (!categoriaFiltro || p.categoriaId === parseInt(categoriaFiltro))
+            && (!marcaFiltro || p.marca === marcaFiltro)
+            && (!gamaFiltro || p.gama === gamaFiltro);
     });
 
     if (orden === 'precio-asc') lista.sort((a, b) => a.precio - b.precio);
@@ -783,6 +804,7 @@ function renderProductos() {
                 <div class="product-photo-card__body">
                     <div class="product-photo-card__tags">
                         <span class="tag tag-dark">${p.marca}</span>
+                        <span class="tag tag-amber">${p.categoria}</span>
                         <span class="tag ${est.tag}">${cant} disponibles</span>
                     </div>
                     <div class="product-photo-card__name">${nombreProducto(p)}</div>
@@ -800,6 +822,7 @@ function renderProductos() {
     }).join('');
 }
 $('#catSearch').addEventListener('input', renderProductos);
+$('#catFiltroCategoria').addEventListener('change', renderProductos);
 $('#catFiltroMarca').addEventListener('change', renderProductos);
 $('#catFiltroGama').addEventListener('change', renderProductos);
 $('#catOrden').addEventListener('change', renderProductos);
