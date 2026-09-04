@@ -315,6 +315,7 @@ function renderView(view) {
 function renderAll() {
     populateSelectMarcas();
     populateSelectCategorias();
+    populateFiltroProveedorIngresos();
     renderDashboard();
     renderInventario();
     renderIngresos();
@@ -443,12 +444,17 @@ function populateSelectCategorias() {
         categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
     $('#filterCategoria').innerHTML = opciones;
     $('#selectorModeloCategoria').innerHTML = opciones;
+    $('#ingFiltroCategoria').innerHTML = opciones;
 }
 function populateSelectCategoriasProducto() {
     $('#prodCategoria').innerHTML = categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
 }
 function populateSelectProveedores(sel) {
     $(sel).innerHTML = proveedores.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+}
+function populateFiltroProveedorIngresos() {
+    $('#ingFiltroProveedor').innerHTML = '<option value="">Todos los proveedores</option>' +
+        proveedores.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
 }
 function populateSelectProductos(sel) {
     $(sel).innerHTML = productos.map(p => `<option value="${p.id}">${nombreProducto(p)}</option>`).join('');
@@ -1057,8 +1063,22 @@ function verIngreso(id) {
     openModal('modalDetalleIngreso');
 }
 
+function limpiarFiltrosIngresos() {
+    $('#ingSearch').value = '';
+    $('#ingFiltroCategoria').value = '';
+    $('#ingFiltroProveedor').value = '';
+    $('#ingDesde').value = '';
+    $('#ingHasta').value = '';
+    renderIngresos();
+}
+
 function renderIngresos() {
     const busqueda = ($('#ingSearch').value || '').toLowerCase();
+    const categoriaFiltro = $('#ingFiltroCategoria').value;
+    const proveedorFiltro = $('#ingFiltroProveedor').value;
+    const desde = $('#ingDesde').value;
+    const hasta = $('#ingHasta').value;
+
     let lista = [...ingresos].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
     if (busqueda) {
         lista = lista.filter(i => {
@@ -1066,8 +1086,19 @@ function renderIngresos() {
             return texto.includes(busqueda);
         });
     }
+    if (proveedorFiltro) lista = lista.filter(i => i.proveedorId === parseInt(proveedorFiltro));
+    if (desde) lista = lista.filter(i => i.fecha >= desde);
+    if (hasta) lista = lista.filter(i => i.fecha <= hasta);
+    if (categoriaFiltro) {
+        const catId = parseInt(categoriaFiltro);
+        lista = lista.filter(i => {
+            const productoIds = [...i.equipos.map(e => e.productoId), ...i.items.map(it => it.productoId)];
+            return productoIds.some(pid => findProducto(pid)?.categoriaId === catId);
+        });
+    }
+
     if (!lista.length) {
-        $('#ingresosBody').innerHTML = '<tr><td colspan="6" class="empty-state">No se encontraron ingresos</td></tr>';
+        $('#ingresosBody').innerHTML = '<tr><td colspan="6" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
         return;
     }
     $('#ingresosBody').innerHTML = lista.map(i => {
@@ -1089,6 +1120,10 @@ function renderIngresos() {
     }).join('');
 }
 $('#ingSearch').addEventListener('input', renderIngresos);
+$('#ingFiltroCategoria').addEventListener('change', renderIngresos);
+$('#ingFiltroProveedor').addEventListener('change', renderIngresos);
+$('#ingDesde').addEventListener('change', renderIngresos);
+$('#ingHasta').addEventListener('change', renderIngresos);
 
 // ===================== VENTAS =====================
 let ventaCart = [];
