@@ -544,10 +544,32 @@
                     <div class="view__header">
                         <div>
                             <h2>Tu cartera de clientes</h2>
+                            <p>Revisa su historial crediticio antes de aprobar una nueva venta a crédito</p>
                         </div>
                         <button class="btn btn--primary" onclick="openModal('modalCliente')">
                             <i class='bx bx-plus'></i> Nuevo Cliente
                         </button>
+                    </div>
+                    <div class="toolbar">
+                        <div class="toolbar__search">
+                            <i class='bx bx-search'></i>
+                            <input type="text" id="cliSearch" placeholder="Buscar por nombre, apellido o DNI/RUC...">
+                        </div>
+                        <select id="cliFiltroEstado">
+                            <option value="">Todos los estados</option>
+                            <option value="al-dia">🟢 Al día</option>
+                            <option value="atraso">🟡 Atrasos leves</option>
+                            <option value="moroso">🔴 Moroso</option>
+                            <option value="sin-historial">⚪ Sin historial</option>
+                        </select>
+                        <select id="cliFiltroEstrellas">
+                            <option value="">Todas las calificaciones</option>
+                            <option value="5">★★★★★ (5)</option>
+                            <option value="4">★★★★☆ (4)</option>
+                            <option value="3">★★★☆☆ (3)</option>
+                            <option value="2">★★☆☆☆ (2)</option>
+                            <option value="1">★☆☆☆☆ (1)</option>
+                        </select>
                     </div>
                     <div class="cards-grid" id="clientesGrid"></div>
                 </section>
@@ -767,6 +789,17 @@
         </div>
     </div>
 
+    <!-- Historial crediticio del cliente -->
+    <div class="modal modal--wide" id="modalHistorialCrediticio">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalHistorialTitle">Historial crediticio</h3>
+                <button class="modal__close" onclick="closeModal('modalHistorialCrediticio')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body" id="historialCrediticioContent"></div>
+        </div>
+    </div>
+
     <!-- Venta -->
     <div class="modal modal--wide" id="modalVenta">
         <div class="modal__box">
@@ -804,6 +837,7 @@
                     </div>
                 </div>
                 <div id="venCreditoWrap" style="display:none;">
+                    <div id="venHistorialClienteWrap" style="display:none;"></div>
                     <div class="form-row form-row--credito">
                         <div class="form-group">
                             <label>Monto inicial (S/)</label>

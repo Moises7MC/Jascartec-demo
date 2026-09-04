@@ -133,6 +133,13 @@ const diasParaVencer = (fecha) => {
     const venc = new Date(fecha + 'T00:00:00');
     return Math.round((venc - hoy) / (1000 * 60 * 60 * 24));
 };
+// Días entre dos fechas simples (YYYY-MM-DD): fechaFin - fechaInicio. Se usa para medir cuánto
+// se atrasó un cliente en pagar una cuota respecto a su vencimiento (historial crediticio).
+const diasEntre = (fechaInicio, fechaFin) => {
+    const a = new Date(fechaInicio + 'T00:00:00');
+    const b = new Date(fechaFin + 'T00:00:00');
+    return Math.round((b - a) / (1000 * 60 * 60 * 24));
+};
 const estadoVencimiento = (dias) => {
     if (dias < 0) return { tag: 'tag-red', texto: `Vencido hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? '' : 's'}` };
     if (dias <= 30) return { tag: 'tag-red', texto: `Vence en ${dias} día${dias === 1 ? '' : 's'}` };
@@ -1202,6 +1209,34 @@ function toggleCampoCredito() {
         actualizarNumCuotasOptions();
         actualizarPreviewCredito();
     }
+    actualizarHistorialClienteVenta();
+}
+
+// Muestra el historial crediticio del cliente elegido apenas la venta es a crédito — el
+// vendedor lo ve en el momento exacto en que tiene que decidir si aprobarle o no un crédito.
+function actualizarHistorialClienteVenta() {
+    const wrap = $('#venHistorialClienteWrap');
+    if ($('#venFormaPago').value !== 'Crédito') { wrap.style.display = 'none'; return; }
+
+    const clienteIdRaw = $('#venClienteId').value;
+    if (!clienteIdRaw) {
+        wrap.style.display = '';
+        wrap.innerHTML = '<div class="credito-preview__vacio">Seleccione un cliente registrado para ver su historial crediticio.</div>';
+        return;
+    }
+
+    const clienteId = parseInt(clienteIdRaw);
+    const c = findCliente(clienteId);
+    const hist = calcularHistorialCrediticio(clienteId);
+    wrap.style.display = '';
+    wrap.innerHTML = !hist.tieneHistorial
+        ? `<div class="historial-compacto historial-compacto--sin-historial">${renderEstrellas(null)}<span class="badge-estado badge-estado--sin-historial">${hist.estadoTexto}</span><span class="historial-compacto__recomendacion">${c.nombre} todavía no tiene historial de créditos.</span></div>`
+        : `<div class="historial-compacto historial-compacto--${hist.estado}">
+                ${renderEstrellas(hist.estrellas)}
+                <span class="badge-estado badge-estado--${hist.estado}">${hist.estadoTexto}</span>
+                <span class="historial-compacto__recomendacion">${hist.recomendacion}</span>
+                <button type="button" class="btn-small-outline" onclick="abrirHistorialCrediticio(${clienteId})">Ver historial completo</button>
+           </div>`;
 }
 
 function actualizarNumCuotasOptions() {
@@ -1266,6 +1301,7 @@ function seleccionarClienteVenta(clienteId) {
     $('#venClienteBuscar').value = c ? c.nombre : '';
     $('#venClienteClear').style.display = c ? '' : 'none';
     cerrarListaClientesVenta();
+    actualizarHistorialClienteVenta();
 }
 
 function limpiarClienteVenta() {
@@ -2049,6 +2085,157 @@ $('#formCliente').addEventListener('submit', async (e) => {
     }
 });
 
+// ===================== HISTORIAL CREDITICIO =====================
+// Calificación de 1 a 5 estrellas según el comportamiento REAL de pago del cliente en sus
+// ventas a crédito. Se calcula acá mismo, con datos que ya están cargados (ventas, abonos,
+// cronograma de cuotas) — no hace falta pedirle nada nuevo al backend.
+//
+// Para cada cuota ya vencida de cada crédito no anulado, se busca en qué fecha el acumulado
+// de abonos (incluye el inicial) alcanzó el monto planeado hasta esa cuota, y se compara contra
+// su fecha de vencimiento: a tiempo, atrasada (con sus días), o vencida y todavía sin pagar.
+function calcularHistorialCrediticio(clienteId) {
+    const ventasCliente = ventas.filter(v => v.clienteId === clienteId);
+    const creditos = ventasCliente.filter(v => v.formaPago === 'Crédito' && !ventaEstaAnulada(v));
+
+    if (!creditos.length) {
+        return {
+            tieneHistorial: false, estrellas: null, estado: 'sin-historial', estadoTexto: '⚪ Sin historial',
+            recomendacion: 'Todavía no tiene compras a crédito registradas.',
+            cuotasATiempo: 0, cuotasAtrasadas: 0, cuotasVencidas: 0,
+            creditosTomados: 0, creditosActivos: 0, saldoPendienteTotal: 0, ventas: ventasCliente
+        };
+    }
+
+    let cuotasATiempo = 0, cuotasAtrasadas = 0, cuotasVencidas = 0, penalizacion = 0, creditosActivos = 0, saldoPendienteTotal = 0;
+
+    creditos.forEach(v => {
+        const saldo = ventaSaldoPendiente(v);
+        if (saldo > 0.01) { creditosActivos++; saldoPendienteTotal += saldo; }
+
+        const abonos = [...(v.abonos || [])].sort((a, b) => a.fecha.localeCompare(b.fecha));
+        let acumuladoPlan = v.montoInicial || 0; // ya "pagado" desde el día de la venta
+
+        (v.cuotas || []).forEach(cuota => {
+            acumuladoPlan += cuota.monto;
+            let acumuladoAbonado = 0, fechaCompletado = null;
+            for (const abono of abonos) {
+                acumuladoAbonado += abono.monto;
+                if (acumuladoAbonado + 0.01 >= acumuladoPlan) { fechaCompletado = abono.fecha; break; }
+            }
+
+            if (fechaCompletado) {
+                const dias = diasEntre(cuota.fechaVencimiento, fechaCompletado);
+                if (dias <= 0) cuotasATiempo++;
+                else if (dias <= 15) { cuotasAtrasadas++; penalizacion += 0.5; }
+                else if (dias <= 30) { cuotasAtrasadas++; penalizacion += 1; }
+                else { cuotasAtrasadas++; penalizacion += 1.5; }
+            } else if (cuota.fechaVencimiento < today()) {
+                cuotasVencidas++; penalizacion += 2;
+            }
+            // Si la cuota todavía no vence y no se completó, no cuenta: aún no es su turno de pagar.
+        });
+    });
+
+    let estrellas = Math.max(1, Math.min(5, Math.floor(5 - penalizacion)));
+    if (cuotasVencidas > 0) estrellas = Math.min(estrellas, 2); // tope duro: moroso activo nunca pasa de 2★
+
+    let estado, estadoTexto, recomendacion;
+    if (cuotasVencidas > 0) {
+        estado = 'moroso'; estadoTexto = '🔴 Moroso';
+        recomendacion = 'No recomendado para un nuevo crédito: tiene cuotas vencidas sin pagar en este momento.';
+    } else if (cuotasAtrasadas > 0) {
+        estado = 'atraso'; estadoTexto = '🟡 Atrasos leves (regularizado)';
+        recomendacion = estrellas >= 4
+            ? 'Apto para crédito, aunque tuvo algún atraso ya regularizado.'
+            : 'Con precaución — considera pedirle un monto inicial más alto.';
+    } else {
+        estado = 'al-dia'; estadoTexto = '🟢 Al día';
+        recomendacion = 'Apto para crédito.';
+    }
+
+    return {
+        tieneHistorial: true, estrellas, estado, estadoTexto, recomendacion,
+        cuotasATiempo, cuotasAtrasadas, cuotasVencidas,
+        creditosTomados: creditos.length, creditosActivos, saldoPendienteTotal, ventas: ventasCliente
+    };
+}
+
+function renderEstrellas(n) {
+    if (n === null || n === undefined) return '<span class="rating-stars rating-stars--vacio">Sin calificar</span>';
+    let html = '<span class="rating-stars">';
+    for (let i = 1; i <= 5; i++) html += `<i class='bx ${i <= n ? 'bxs-star' : 'bx-star'}'></i>`;
+    html += '</span>';
+    return html;
+}
+
+// Tabla de compras del cliente, reutilizada tanto en el modal completo como (implícitamente)
+// para armar los números del resumen.
+function tablaComprasCliente(hist) {
+    const lista = [...hist.ventas].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+    if (!lista.length) return '<div class="empty-state">Sin compras registradas</div>';
+    const filas = lista.map(v => {
+        const anulada = ventaEstaAnulada(v);
+        const { tag, texto } = tagFormaPago(v);
+        const accion = anulada
+            ? `<button class="btn-small" onclick="verBoleta(${v.id})">Ver</button>`
+            : (v.formaPago === 'Crédito'
+                ? `<button class="btn-small" onclick="closeModal('modalHistorialCrediticio'); abrirGestionPago(${v.id})">Gestionar pago</button>`
+                : `<button class="btn-small" onclick="verBoleta(${v.id})">Ver</button>`);
+        return `
+            <tr style="${anulada ? 'opacity:.55;' : ''}">
+                <td><strong>${v.numBoleta}</strong></td>
+                <td>${formatDate(v.fecha)}</td>
+                <td>${v.formaPago}</td>
+                <td>${formatPEN(ventaTotal(v) + (v.recargo || 0))}</td>
+                <td>${anulada ? '<span class="tag tag-red">Anulada</span>' : `<span class="tag ${tag}">${texto}</span>`}</td>
+                <td class="actions-cell">${accion}</td>
+            </tr>
+        `;
+    }).join('');
+    return `
+        <table class="table table--sm">
+            <thead><tr><th>Boleta</th><th>Fecha</th><th>Forma de pago</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+            <tbody>${filas}</tbody>
+        </table>
+    `;
+}
+
+function abrirHistorialCrediticio(clienteId) {
+    const c = findCliente(clienteId);
+    if (!c) return;
+    const hist = calcularHistorialCrediticio(clienteId);
+
+    $('#modalHistorialTitle').textContent = `Historial crediticio — ${c.nombre}`;
+    const resumen = hist.tieneHistorial ? `
+        <div class="historial-resumen historial-resumen--${hist.estado}">
+            ${renderEstrellas(hist.estrellas)}
+            <div class="historial-resumen__estado">${hist.estadoTexto}</div>
+            <div class="historial-resumen__recomendacion">${hist.recomendacion}</div>
+        </div>
+        <div class="detalle-grid" style="margin:1.1rem 0;">
+            <div><div class="label">Créditos tomados</div><div class="value">${hist.creditosTomados}</div></div>
+            <div><div class="label">Créditos activos</div><div class="value">${hist.creditosActivos}</div></div>
+            <div><div class="label">Cuotas a tiempo</div><div class="value">${hist.cuotasATiempo}</div></div>
+            <div><div class="label">Cuotas con atraso</div><div class="value">${hist.cuotasAtrasadas}</div></div>
+            <div><div class="label">Cuotas vencidas sin pagar</div><div class="value">${hist.cuotasVencidas}</div></div>
+            <div><div class="label">Saldo pendiente total</div><div class="value">${formatPEN(hist.saldoPendienteTotal)}</div></div>
+        </div>
+    ` : `
+        <div class="historial-resumen historial-resumen--sin-historial">
+            ${renderEstrellas(null)}
+            <div class="historial-resumen__estado">${hist.estadoTexto}</div>
+            <div class="historial-resumen__recomendacion">${hist.recomendacion}</div>
+        </div>
+    `;
+
+    $('#historialCrediticioContent').innerHTML = `
+        ${resumen}
+        <h4 class="section-subtitle">Todas sus compras</h4>
+        <div class="table-wrap" style="margin-top:.5rem;">${tablaComprasCliente(hist)}</div>
+    `;
+    openModal('modalHistorialCrediticio');
+}
+
 function editarCliente(id) {
     const c = findCliente(id);
     if (!c) return;
@@ -2083,21 +2270,51 @@ function renderClientes() {
         $('#clientesGrid').innerHTML = '<div class="empty-state">Aún no ha registrado clientes</div>';
         return;
     }
-    $('#clientesGrid').innerHTML = clientes.map(c => `
+
+    const busqueda = ($('#cliSearch').value || '').trim().toLowerCase();
+    const estadoFiltro = $('#cliFiltroEstado').value;
+    const estrellasFiltro = $('#cliFiltroEstrellas').value;
+
+    // El historial se calcula una vez por cliente visible y se reutiliza para filtrar y pintar.
+    const historiales = new Map();
+    clientes.forEach(c => historiales.set(c.id, calcularHistorialCrediticio(c.id)));
+
+    let lista = clientes.filter(c => `${c.nombre} ${c.documento}`.toLowerCase().includes(busqueda));
+    if (estadoFiltro) lista = lista.filter(c => historiales.get(c.id).estado === estadoFiltro);
+    if (estrellasFiltro) lista = lista.filter(c => historiales.get(c.id).estrellas === parseInt(estrellasFiltro));
+
+    if (!lista.length) {
+        $('#clientesGrid').innerHTML = '<div class="empty-state">No se encontraron clientes con esos filtros</div>';
+        return;
+    }
+
+    $('#clientesGrid').innerHTML = lista.map(c => {
+        const hist = historiales.get(c.id);
+        return `
         <div class="entity-card">
             <div class="entity-card__icon"><i class='bx bx-user'></i></div>
             <div class="entity-name">${c.nombre}</div>
             <span class="tag tag-dark">${c.tipo}</span>
             <div class="entity-info">🪪 ${c.documento}</div>
-            <div class="entity-info">📞 ${c.telefono}</div>
-            <div class="entity-info">✉️ ${c.email}</div>
+            <div class="entity-info">📞 ${c.telefono || '—'}</div>
+            <div class="entity-info">✉️ ${c.email || '—'}</div>
+            <div class="entity-credito">
+                ${renderEstrellas(hist.estrellas)}
+                <span class="badge-estado badge-estado--${hist.estado}">${hist.estadoTexto}</span>
+                ${hist.saldoPendienteTotal > 0.01 ? `<span class="entity-info entity-info--deuda">Debe ${formatPEN(hist.saldoPendienteTotal)}</span>` : ''}
+            </div>
             <div class="entity-actions">
-                <button class="btn-small" onclick="editarCliente(${c.id})">Editar</button>
+                <button class="btn-small" onclick="abrirHistorialCrediticio(${c.id})">Ver historial</button>
+                <button class="btn-small-outline" onclick="editarCliente(${c.id})">Editar</button>
                 <button class="btn-small-danger" onclick="eliminarCliente(${c.id})">Eliminar</button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
+$('#cliSearch').addEventListener('input', renderClientes);
+$('#cliFiltroEstado').addEventListener('change', renderClientes);
+$('#cliFiltroEstrellas').addEventListener('change', renderClientes);
 
 // ===================== FACTURAS =====================
 function generarLetras() {

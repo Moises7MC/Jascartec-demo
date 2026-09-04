@@ -652,7 +652,63 @@ img {
 }
 .entity-name { font-weight: var(--font-semi-bold); color: var(--title-color); font-size: 1.02rem; margin-bottom: .1rem; }
 .entity-info { font-size: var(--small-font-size); color: var(--text-color); }
+.entity-info--deuda { color: var(--error-color); font-weight: var(--font-medium); }
 .entity-actions { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
+
+/*=============== HISTORIAL CREDITICIO (Clientes / Registrar Venta) ===============*/
+.entity-credito { display: flex; flex-direction: column; align-items: flex-start; gap: .4rem; margin: .3rem 0; }
+
+.rating-stars { display: inline-flex; gap: .1rem; color: #f5a623; font-size: 1.05rem; line-height: 1; }
+.rating-stars i { line-height: 1; }
+.rating-stars--vacio { font-size: var(--smaller-font-size); color: var(--text-color-light); font-style: italic; }
+
+.badge-estado {
+  display: inline-flex;
+  align-items: center;
+  padding: .3rem .75rem;
+  border-radius: 1rem;
+  font-size: var(--smaller-font-size);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+}
+.badge-estado--al-dia { background: hsl(145, 63%, 94%); color: var(--success-color); }
+.badge-estado--atraso { background: hsl(38, 92%, 93%); color: hsl(30, 80%, 40%); }
+.badge-estado--moroso { background: hsl(0, 79%, 95%); color: var(--error-color); }
+.badge-estado--sin-historial { background: var(--container-color); color: var(--text-color-light); }
+
+/* Resumen grande, arriba del modal de historial completo */
+.historial-resumen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: var(--container-color);
+  text-align: center;
+}
+.historial-resumen .rating-stars { font-size: 1.75rem; }
+.historial-resumen__estado { font-size: 1.05rem; font-weight: var(--font-semi-bold); color: var(--title-color); }
+.historial-resumen__recomendacion { font-size: var(--small-font-size); color: var(--text-color); max-width: 32rem; }
+.historial-resumen--al-dia { background: hsl(145, 63%, 95%); }
+.historial-resumen--atraso { background: hsl(38, 92%, 95%); }
+.historial-resumen--moroso { background: hsl(0, 79%, 96%); }
+
+/* Bloque compacto dentro de Registrar Venta al elegir un cliente a crédito */
+.historial-compacto {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  flex-wrap: wrap;
+  padding: .85rem 1rem;
+  border-radius: .75rem;
+  background: var(--container-color);
+  margin-bottom: 1rem;
+}
+.historial-compacto__recomendacion { flex: 1; min-width: 160px; font-size: var(--small-font-size); color: var(--text-color); }
+.historial-compacto--al-dia { background: hsl(145, 63%, 94%); }
+.historial-compacto--atraso { background: hsl(38, 92%, 93%); }
+.historial-compacto--moroso { background: hsl(0, 79%, 95%); }
 
 /*=============== MAINTENANCE LIST (marcas) ===============*/
 .maint-list {
