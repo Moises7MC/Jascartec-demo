@@ -789,17 +789,6 @@
         </div>
     </div>
 
-    <!-- Historial crediticio del cliente -->
-    <div class="modal modal--wide" id="modalHistorialCrediticio">
-        <div class="modal__box">
-            <div class="modal__header">
-                <h3 id="modalHistorialTitle">Historial crediticio</h3>
-                <button class="modal__close" onclick="closeModal('modalHistorialCrediticio')"><i class='bx bx-x'></i></button>
-            </div>
-            <div class="modal__body" id="historialCrediticioContent"></div>
-        </div>
-    </div>
-
     <!-- Venta -->
     <div class="modal modal--wide" id="modalVenta">
         <div class="modal__box">
@@ -926,6 +915,19 @@
                 </select>
                 <div class="model-picker-grid" id="selectorModeloGrid"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- Historial crediticio del cliente (puede abrirse encima de Registrar Venta, por
+         eso va después de modalVenta en el documento: con el mismo z-index, gana el que
+         está más abajo en el HTML) -->
+    <div class="modal modal--wide" id="modalHistorialCrediticio">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3 id="modalHistorialTitle">Historial crediticio</h3>
+                <button class="modal__close" onclick="closeModal('modalHistorialCrediticio')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body" id="historialCrediticioContent"></div>
         </div>
     </div>
 
