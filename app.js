@@ -1559,7 +1559,6 @@ function construirTicketHTML(v) {
     const total = ventaTotal(v);
     const recargo = v.recargo || 0;
     const esCredito = v.formaPago === 'Crédito';
-    const proximaCuota = esCredito ? (v.cuotas || []).find(c => !c.pagada) : null;
 
     const filasItems = v.items.map(it => `
         <div class="ticket__item">
@@ -1567,6 +1566,12 @@ function construirTicketHTML(v) {
             <div class="ticket__row"><span></span><span>${formatPEN(it.precioUnit * it.cantidad)}</span></div>
         </div>
     `).join('');
+
+    // A crédito, el cliente se lleva el cronograma COMPLETO (todas las cuotas con su fecha),
+    // no solo la próxima — es lo que va a usar para saber cuándo le toca pagar cada vez.
+    const filasCuotas = esCredito ? (v.cuotas || []).map(c => `
+        <div class="ticket__row"><span>Cuota ${c.numero} — ${formatDate(c.fechaVencimiento)}</span><span>${formatPEN(c.monto)}</span></div>
+    `).join('') : '';
 
     return `
         <div class="ticket__center">
@@ -1586,7 +1591,9 @@ function construirTicketHTML(v) {
         ${esCredito ? `
             <div class="ticket__row"><span>Inicial pagado:</span><span>${formatPEN(v.montoInicial || 0)}</span></div>
             <div class="ticket__row"><span>Saldo pendiente:</span><span>${formatPEN(ventaSaldoPendiente(v))}</span></div>
-            ${proximaCuota ? `<div class="ticket__row"><span>Próx. cuota:</span><span>${formatDateLong(proximaCuota.fechaVencimiento)}</span></div>` : ''}
+            <hr class="ticket__sep">
+            <div class="ticket__center" style="font-weight:bold;">CRONOGRAMA DE PAGOS</div>
+            ${filasCuotas}
         ` : ''}
         <hr class="ticket__sep">
         <div class="ticket__center ticket__small">
@@ -1614,6 +1621,26 @@ function renderBoleta(v) {
     ventaBoletaActual = v;
     const total = ventaTotal(v);
     const igv = total - total / 1.18;
+    const recargo = v.recargo || 0;
+    const esCredito = v.formaPago === 'Crédito';
+
+    // A crédito, el cliente necesita ver el cronograma completo acá mismo — la fecha y el
+    // monto de cada cuota — para saber cuándo le toca pagar, no solo el total de la venta.
+    const cronogramaHtml = esCredito ? `
+        <div class="detalle-grid" style="margin-top:1rem;">
+            <div><div class="label">Monto inicial</div><div class="value">${formatPEN(v.montoInicial || 0)}</div></div>
+            <div><div class="label">Recargo por crédito</div><div class="value">${formatPEN(recargo)}</div></div>
+            <div><div class="label">Total a pagar</div><div class="value">${formatPEN(total + recargo)}</div></div>
+            <div><div class="label">Saldo pendiente</div><div class="value">${formatPEN(ventaSaldoPendiente(v))}</div></div>
+        </div>
+        <h4 class="section-subtitle" style="margin-top:1rem;">Cronograma de pagos${v.frecuenciaPago ? ` (${v.frecuenciaPago.toLowerCase()})` : ''}</h4>
+        <table class="cronograma-table">
+            <thead><tr><th>Cuota</th><th>Fecha de pago</th><th>Monto</th></tr></thead>
+            <tbody>
+                ${(v.cuotas || []).map(c => `<tr><td>${c.numero}</td><td>${formatDateLong(c.fechaVencimiento)}</td><td>${formatPEN(c.monto)}</td></tr>`).join('')}
+            </tbody>
+        </table>
+    ` : '';
 
     $('#boletaContent').innerHTML = `
         <div class="boleta">
@@ -1651,6 +1678,7 @@ function renderBoleta(v) {
                 <div><span>IGV (18%):</span><span>${formatPEN(igv)}</span></div>
                 <div class="boleta__total-final"><span>Total:</span><span>${formatPEN(total)}</span></div>
             </div>
+            ${cronogramaHtml}
             <p class="boleta__footer">Gracias por su compra · <strong>${negocio.web}</strong></p>
         </div>
     `;
