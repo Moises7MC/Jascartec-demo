@@ -69,6 +69,8 @@ const findCliente = (id) => clientes.find(c => c.id === id);
 const findMarca = (id) => marcas.find(m => m.id === id);
 const findCategoria = (id) => categorias.find(c => c.id === id);
 const nombreClienteVenta = (v) => v.cliente; // el backend ya arma "Cliente varios (sin registrar)" si aplica
+// Un equipo dual SIM trae 2 IMEIs; se muestran juntos separados por "/" donde sea que aparezca uno solo hoy.
+const textoImeis = (imei, imei2) => imei2 ? `${imei} / ${imei2}` : (imei || '—');
 // Los celulares muestran sus specs (almacenamiento/color); el resto de categorías no las tiene.
 const nombreProducto = (p) => {
     if (!p) return '(modelo eliminado)';
@@ -388,6 +390,7 @@ function openModal(id) {
             categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
         populateSelectProductosIngreso();
         $('#ingImei').value = '';
+        $('#ingImei2').value = '';
         $('#ingCantidad').value = '';
         $('#ingCosto').value = '';
         renderIngresoCart();
@@ -1000,16 +1003,21 @@ function agregarItemIngreso() {
 
     if (producto.requiereImei) {
         const imei = $('#ingImei').value.trim();
+        const imei2 = $('#ingImei2').value.trim();
         if (!/^\d{14,16}$/.test(imei)) { toast('✗ Ingrese un IMEI válido (14 a 16 dígitos)', 'error'); return; }
-        if (ingresoCart.some(it => it.imei === imei)) { toast('✗ Ese IMEI ya está en la lista', 'error'); return; }
+        if (imei2 && !/^\d{14,16}$/.test(imei2)) { toast('✗ El IMEI 2 debe tener de 14 a 16 dígitos', 'error'); return; }
+        if (imei2 && imei2 === imei) { toast('✗ El IMEI 2 no puede ser igual al IMEI principal', 'error'); return; }
+        const imeisUsados = ingresoCart.flatMap(it => [it.imei, it.imei2]).filter(Boolean);
+        if (imeisUsados.includes(imei) || (imei2 && imeisUsados.includes(imei2))) { toast('✗ Ese IMEI ya está en la lista', 'error'); return; }
 
-        ingresoCart.push({ key: `imei-${imei}`, productoId, imei, cantidad: null, costoUnit });
+        ingresoCart.push({ key: `imei-${imei}`, productoId, imei, imei2: imei2 || null, cantidad: null, costoUnit });
         $('#ingImei').value = '';
+        $('#ingImei2').value = '';
     } else {
         const cantidad = parseInt($('#ingCantidad').value);
         if (!cantidad || cantidad < 1) { toast('✗ Ingrese una cantidad válida', 'error'); return; }
 
-        ingresoCart.push({ key: `prod-${productoId}-${Date.now()}`, productoId, imei: null, cantidad, costoUnit });
+        ingresoCart.push({ key: `prod-${productoId}-${Date.now()}`, productoId, imei: null, imei2: null, cantidad, costoUnit });
         $('#ingCantidad').value = '';
     }
     $('#ingCosto').value = '';
@@ -1030,7 +1038,7 @@ function renderIngresoCart() {
     $('#ingresoCartBody').innerHTML = ingresoCart.map(it => `
         <tr>
             <td>${nombreProducto(findProducto(it.productoId))}</td>
-            <td>${it.imei || '—'}</td>
+            <td>${textoImeis(it.imei, it.imei2)}</td>
             <td>${it.cantidad ?? 1}</td>
             <td>${formatPEN(it.costoUnit)}</td>
             <td><button class="btn-icon" onclick="quitarItemIngreso('${it.key}')"><i class='bx bx-trash'></i></button></td>
@@ -1093,9 +1101,9 @@ function verIngreso(id) {
         </div>
         <div class="table-wrap" style="margin-top:1rem;">
             <table class="table table--sm">
-                <thead><tr><th>Modelo</th><th>IMEI</th><th>Cant.</th><th>Costo</th><th>Estado</th></tr></thead>
+                <thead><tr><th>Modelo</th><th>IMEI(s)</th><th>Cant.</th><th>Costo</th><th>Estado</th></tr></thead>
                 <tbody>
-                    ${ing.equipos.map(e => `<tr><td>${e.producto}</td><td>${e.imei}</td><td>1</td><td>${formatPEN(e.costoCompra)}</td><td>${e.estadoVenta}</td></tr>`).join('')}
+                    ${ing.equipos.map(e => `<tr><td>${e.producto}</td><td>${textoImeis(e.imei, e.imei2)}</td><td>1</td><td>${formatPEN(e.costoCompra)}</td><td>${e.estadoVenta}</td></tr>`).join('')}
                     ${ing.items.map(it => `<tr><td>${it.producto}</td><td>—</td><td>${it.cantidad}</td><td>${formatPEN(it.costoUnit)}</td><td>—</td></tr>`).join('')}
                 </tbody>
             </table>
@@ -1123,7 +1131,7 @@ function renderIngresos() {
     let lista = [...ingresos].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
     if (busqueda) {
         lista = lista.filter(i => {
-            const texto = `${i.numeroFactura || ''} ${i.proveedor} ${i.equipos.map(e => e.imei).join(' ')}`.toLowerCase();
+            const texto = `${i.numeroFactura || ''} ${i.proveedor} ${i.equipos.map(e => `${e.imei} ${e.imei2 || ''}`).join(' ')}`.toLowerCase();
             return texto.includes(busqueda);
         });
     }
@@ -1442,7 +1450,7 @@ async function cargarEquiposDisponiblesVenta() {
         $('#venEquipoSel').innerHTML = '<option value="">Sin stock disponible</option>';
         return;
     }
-    $('#venEquipoSel').innerHTML = ventaEquiposDisponiblesCache.map(e => `<option value="${e.id}">${e.imei} (ingresó ${formatDate(e.fechaIngreso)})</option>`).join('');
+    $('#venEquipoSel').innerHTML = ventaEquiposDisponiblesCache.map(e => `<option value="${e.id}">${textoImeis(e.imei, e.imei2)} (ingresó ${formatDate(e.fechaIngreso)})</option>`).join('');
 }
 
 function agregarProductoVenta() {
@@ -1455,7 +1463,7 @@ function agregarProductoVenta() {
         const equipo = ventaEquiposDisponiblesCache.find(e => e.id === equipoId);
         if (!equipoId || !equipo) { toast('✗ Elija un IMEI disponible', 'error'); return; }
 
-        ventaCart.push({ key: `eq-${equipoId}`, productoId, equipoId, imei: equipo.imei, cantidad: 1, precioUnit: prod.precio });
+        ventaCart.push({ key: `eq-${equipoId}`, productoId, equipoId, imei: equipo.imei, imei2: equipo.imei2, cantidad: 1, precioUnit: prod.precio });
         cargarEquiposDisponiblesVenta();
     } else {
         const cantidad = parseInt($('#venCantidad').value);
@@ -1465,7 +1473,7 @@ function agregarProductoVenta() {
 
         const existente = ventaCart.find(it => it.productoId === productoId && !it.equipoId);
         if (existente) existente.cantidad += cantidad;
-        else ventaCart.push({ key: `prod-${productoId}`, productoId, equipoId: null, imei: null, cantidad, precioUnit: prod.precio });
+        else ventaCart.push({ key: `prod-${productoId}`, productoId, equipoId: null, imei: null, imei2: null, cantidad, precioUnit: prod.precio });
         $('#venCantidad').value = '';
     }
     renderVentaCart();
@@ -1486,7 +1494,7 @@ function renderVentaCart() {
     $('#ventaCartBody').innerHTML = ventaCart.map(it => `
         <tr>
             <td>${nombreProducto(findProducto(it.productoId))}</td>
-            <td>${it.imei || '—'}</td>
+            <td>${textoImeis(it.imei, it.imei2)}</td>
             <td>${it.cantidad}</td>
             <td>${formatPEN(it.precioUnit * it.cantidad)}</td>
             <td><button class="btn-icon" onclick="quitarProductoVenta('${it.key}')"><i class='bx bx-trash'></i></button></td>
@@ -1562,7 +1570,7 @@ function construirTicketHTML(v) {
 
     const filasItems = v.items.map(it => `
         <div class="ticket__item">
-            <span class="ticket__item-nombre">${it.cantidad > 1 ? it.cantidad + 'x ' : ''}${it.producto}${it.imei ? ` (IMEI ${it.imei})` : ''}</span>
+            <span class="ticket__item-nombre">${it.cantidad > 1 ? it.cantidad + 'x ' : ''}${it.producto}${it.imei ? ` (IMEI ${textoImeis(it.imei, it.imei2)})` : ''}</span>
             <div class="ticket__row"><span></span><span>${formatPEN(it.precioUnit * it.cantidad)}</span></div>
         </div>
     `).join('');
@@ -1667,9 +1675,9 @@ function renderBoleta(v) {
             </div>
             <div class="table-wrap" style="margin-top:1rem;">
                 <table class="table table--sm">
-                    <thead><tr><th>Producto</th><th>IMEI</th><th>Cant.</th><th>Precio</th></tr></thead>
+                    <thead><tr><th>Producto</th><th>IMEI(s)</th><th>Cant.</th><th>Precio</th></tr></thead>
                     <tbody>
-                        ${v.items.map(it => `<tr><td>${it.producto}</td><td>${it.imei || '—'}</td><td>${it.cantidad}</td><td>${formatPEN(it.precioUnit * it.cantidad)}</td></tr>`).join('')}
+                        ${v.items.map(it => `<tr><td>${it.producto}</td><td>${textoImeis(it.imei, it.imei2)}</td><td>${it.cantidad}</td><td>${formatPEN(it.precioUnit * it.cantidad)}</td></tr>`).join('')}
                     </tbody>
                 </table>
             </div>

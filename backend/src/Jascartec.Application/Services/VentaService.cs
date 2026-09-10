@@ -317,7 +317,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             var producto = i.Equipo?.Producto ?? i.Producto!;
             return new VentaItemDto(
                 i.EquipoId, producto.Id, producto.Marca.Nombre,
-                $"{producto.Marca.Nombre} {producto.Modelo}", i.Equipo?.Imei, i.Cantidad, i.PrecioUnit);
+                $"{producto.Marca.Nombre} {producto.Modelo}", i.Equipo?.Imei, i.Equipo?.Imei2, i.Cantidad, i.PrecioUnit);
         }).ToList();
         var abonos = v.Abonos.OrderBy(a => a.Fecha).Select(a => new AbonoDto(a.Id, a.Fecha, a.Monto)).ToList();
         var cuotas = ConstruirCronograma(v);

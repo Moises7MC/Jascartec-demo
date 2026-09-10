@@ -27,16 +27,21 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
         if (await unitOfWork.Proveedores.GetByIdAsync(request.ProveedorId, ct) is null)
             throw new BusinessRuleException($"El proveedor con id '{request.ProveedorId}' no existe.");
 
-        // Un IMEI duplicado dentro del mismo request, o ya existente en la BD, se rechaza.
+        // Un IMEI duplicado dentro del mismo request, o ya existente en la BD, se rechaza —
+        // sin importar si aparece como el principal o como el segundo (dual SIM) de otra línea.
         var imeisEnRequest = new HashSet<string>();
         foreach (var item in request.Items)
         {
-            if (!string.IsNullOrWhiteSpace(item.Imei))
+            if (!string.IsNullOrWhiteSpace(item.Imei) && !string.IsNullOrWhiteSpace(item.Imei2) && item.Imei == item.Imei2)
+                throw new BusinessRuleException("El IMEI 2 no puede ser igual al IMEI principal.");
+
+            foreach (var imei in new[] { item.Imei, item.Imei2 })
             {
-                if (!imeisEnRequest.Add(item.Imei))
-                    throw new BusinessRuleException($"El IMEI '{item.Imei}' está repetido en el ingreso.");
-                if (await unitOfWork.Equipos.ExisteImeiAsync(item.Imei, ct))
-                    throw new BusinessRuleException($"El IMEI '{item.Imei}' ya está registrado en el sistema.");
+                if (string.IsNullOrWhiteSpace(imei)) continue;
+                if (!imeisEnRequest.Add(imei))
+                    throw new BusinessRuleException($"El IMEI '{imei}' está repetido en el ingreso.");
+                if (await unitOfWork.Equipos.ExisteImeiAsync(imei, ct))
+                    throw new BusinessRuleException($"El IMEI '{imei}' ya está registrado en el sistema.");
             }
         }
 
@@ -64,6 +69,7 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
                 {
                     ProductoId = item.ProductoId,
                     Imei = item.Imei,
+                    Imei2 = item.Imei2,
                     CostoCompra = item.CostoUnit,
                     FechaIngreso = request.Fecha,
                     ProveedorId = request.ProveedorId,
@@ -115,7 +121,7 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
 
     private static IngresoDto ToDto(Ingreso i) => new(
         i.Id, i.Fecha, i.ProveedorId, i.Proveedor.Nombre, i.NumeroFactura,
-        i.Equipos.Select(e => new EquipoDto(e.Id, e.ProductoId, $"{e.Producto.Marca.Nombre} {e.Producto.Modelo}", e.Imei, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString())).ToList(),
+        i.Equipos.Select(e => new EquipoDto(e.Id, e.ProductoId, $"{e.Producto.Marca.Nombre} {e.Producto.Modelo}", e.Imei, e.Imei2, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString())).ToList(),
         i.Items.Select(it => new IngresoItemDto(it.Id, it.ProductoId, $"{it.Producto.Marca.Nombre} {it.Producto.Modelo}", it.Cantidad, it.CostoUnit)).ToList(),
         i.CreadoEn);
 }

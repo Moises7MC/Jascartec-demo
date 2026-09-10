@@ -830,6 +830,10 @@
                         <label>IMEI</label>
                         <input type="text" id="ingImei" placeholder="15 dígitos" maxlength="15">
                     </div>
+                    <div class="form-group" id="ingImei2Wrap">
+                        <label>IMEI 2 (opcional, dual SIM)</label>
+                        <input type="text" id="ingImei2" placeholder="15 dígitos" maxlength="15">
+                    </div>
                     <div class="form-group" id="ingCantidadWrap" style="display:none;">
                         <label>Cantidad</label>
                         <input type="number" id="ingCantidad" min="1" step="1" placeholder="Ej: 10">
@@ -845,7 +849,7 @@
 
                 <div class="table-wrap">
                     <table class="table table--sm">
-                        <thead><tr><th>Modelo</th><th>IMEI</th><th>Cant.</th><th>Costo</th><th></th></tr></thead>
+                        <thead><tr><th>Modelo</th><th>IMEI(s)</th><th>Cant.</th><th>Costo</th><th></th></tr></thead>
                         <tbody id="ingresoCartBody"></tbody>
                     </table>
                 </div>
@@ -965,7 +969,7 @@
 
                 <div class="table-wrap">
                     <table class="table table--sm">
-                        <thead><tr><th>Modelo</th><th>IMEI</th><th>Cant.</th><th>Subtotal</th><th></th></tr></thead>
+                        <thead><tr><th>Modelo</th><th>IMEI(s)</th><th>Cant.</th><th>Subtotal</th><th></th></tr></thead>
                         <tbody id="ventaCartBody"></tbody>
                     </table>
                 </div>

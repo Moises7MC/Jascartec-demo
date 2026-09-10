@@ -14,6 +14,8 @@ public class EquipoConfiguration : IEntityTypeConfiguration<Equipo>
         b.Property(x => x.ProductoId).HasColumnName("producto_id").IsRequired();
         b.Property(x => x.Imei).HasColumnName("imei").HasMaxLength(15).IsRequired();
         b.HasIndex(x => x.Imei).IsUnique();
+        b.Property(x => x.Imei2).HasColumnName("imei2").HasMaxLength(15);
+        b.HasIndex(x => x.Imei2).IsUnique();
         b.Property(x => x.EstadoFisico).HasColumnName("estado_fisico").HasMaxLength(20).IsRequired();
         b.Property(x => x.CostoCompra).HasColumnName("costo_compra").HasColumnType("numeric(10,2)").IsRequired();
         b.Property(x => x.FechaIngreso).HasColumnName("fecha_ingreso").IsRequired();

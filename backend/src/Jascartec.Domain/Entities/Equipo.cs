@@ -8,6 +8,8 @@ public class Equipo
     public int Id { get; set; }
     public int ProductoId { get; set; }
     public string Imei { get; set; } = string.Empty;
+    // Los celulares dual SIM traen 2 IMEIs (uno por línea); este queda vacío en los que solo tienen uno.
+    public string? Imei2 { get; set; }
     public string EstadoFisico { get; set; } = "Nuevo";
     public decimal CostoCompra { get; set; }
     public DateOnly FechaIngreso { get; set; }

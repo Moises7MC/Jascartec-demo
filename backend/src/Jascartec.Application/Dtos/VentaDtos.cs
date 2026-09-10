@@ -2,7 +2,7 @@ namespace Jascartec.Application.Dtos;
 
 /// <summary>EquipoId/Imei son nulos en una línea por cantidad (producto de categoría sin IMEI); Cantidad
 /// es siempre 1 en una línea de equipo puntual.</summary>
-public record VentaItemDto(int? EquipoId, int ProductoId, string Marca, string Producto, string? Imei, int Cantidad, decimal PrecioUnit);
+public record VentaItemDto(int? EquipoId, int ProductoId, string Marca, string Producto, string? Imei, string? Imei2, int Cantidad, decimal PrecioUnit);
 
 public record AbonoDto(int Id, DateOnly Fecha, decimal Monto);
 

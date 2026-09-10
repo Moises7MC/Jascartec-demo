@@ -15,7 +15,7 @@ public class EquipoService(IUnitOfWork unitOfWork) : IEquipoService
 
         return equipos
             .OrderBy(e => e.Id)
-            .Select(e => new EquipoDto(e.Id, e.ProductoId, nombreProducto, e.Imei, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString()))
+            .Select(e => new EquipoDto(e.Id, e.ProductoId, nombreProducto, e.Imei, e.Imei2, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString()))
             .ToList();
     }
 }
