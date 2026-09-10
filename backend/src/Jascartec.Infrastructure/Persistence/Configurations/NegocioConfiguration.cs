@@ -23,10 +23,10 @@ public class NegocioConfiguration : IEntityTypeConfiguration<Negocio>
             Id = 1,
             RazonSocial = "Jascartec S.A.C.",
             Ruc = "20601234567",
-            Direccion = "Jr. Comercio 456, Trujillo, La Libertad",
-            Telefono = "+51 944 555 111",
-            Email = "ventas@jascartec.pe",
-            Web = "www.jascartec.pe"
+            Direccion = "Calle Cajamarca 424 - Chepén, Chepén, Peru, 13871, La Libertad",
+            Telefono = "+51  920 734 014",
+            Email = "jasmany6@hotmail.com",
+            Web = "www.jascartec.com"
         });
     }
 }
