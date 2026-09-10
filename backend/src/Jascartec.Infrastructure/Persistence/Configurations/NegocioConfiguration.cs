@@ -23,7 +23,7 @@ public class NegocioConfiguration : IEntityTypeConfiguration<Negocio>
             Id = 1,
             RazonSocial = "Jascartec S.A.C.",
             Ruc = "20601234567",
-            Direccion = "Calle Cajamarca 424 - Chepén, Chepén, Peru, 13871, La Libertad",
+            Direccion = "Calle Cajamarca 424 - Chepén, Peru, 13871, La Libertad",
             Telefono = "+51  920 734 014",
             Email = "jasmany6@hotmail.com",
             Web = "www.jascartec.com"
