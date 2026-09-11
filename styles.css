@@ -443,6 +443,7 @@ img {
   border-radius: 1.5rem;
   font-size: var(--smaller-font-size);
   font-weight: var(--font-medium);
+  white-space: nowrap;
 }
 .btn-small { background: var(--first-color-light); color: var(--first-color-alt); }
 .btn-small:hover { background: var(--first-color); color: #fff; }
@@ -640,6 +641,15 @@ img {
 .actions-cell { display: flex; gap: .4rem; flex-wrap: wrap; }
 .table-thumb-row { display: flex; align-items: center; gap: .65rem; }
 .table-thumb { width: 38px; height: 38px; object-fit: contain; background: var(--container-color); border-radius: .5rem; padding: .2rem; flex-shrink: 0; }
+.table-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--first-color-light);
+  color: var(--first-color-alt);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
 .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--text-color-light); font-size: var(--small-font-size); }
 
 /*=============== TAGS ===============*/

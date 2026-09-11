@@ -2568,7 +2568,7 @@ async function eliminarCliente(id) {
 
 function renderClientes() {
     if (!clientes.length) {
-        $('#clientesGrid').innerHTML = '<div class="empty-state">Aún no ha registrado clientes</div>';
+        $('#clientesBody').innerHTML = '<tr><td colspan="7" class="empty-state">Aún no ha registrado clientes</td></tr>';
         return;
     }
 
@@ -2585,31 +2585,31 @@ function renderClientes() {
     if (estrellasFiltro) lista = lista.filter(c => historiales.get(c.id).estrellas === parseInt(estrellasFiltro));
 
     if (!lista.length) {
-        $('#clientesGrid').innerHTML = '<div class="empty-state">No se encontraron clientes con esos filtros</div>';
+        $('#clientesBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron clientes con esos filtros</td></tr>';
         return;
     }
 
-    $('#clientesGrid').innerHTML = lista.map(c => {
+    $('#clientesBody').innerHTML = lista.map(c => {
         const hist = historiales.get(c.id);
         return `
-        <div class="entity-card">
-            <div class="entity-card__icon"><i class='bx bx-user'></i></div>
-            <div class="entity-name">${c.nombre}</div>
-            <span class="tag tag-dark">${c.tipo}</span>
-            <div class="entity-info">🪪 ${c.documento}</div>
-            <div class="entity-info">📞 ${c.telefono || '—'}</div>
-            <div class="entity-info">✉️ ${c.email || '—'}</div>
-            <div class="entity-credito">
-                ${renderEstrellas(hist.estrellas)}
-                <span class="badge-estado badge-estado--${hist.estado}">${hist.estadoTexto}</span>
-                ${hist.saldoPendienteTotal > 0.01 ? `<span class="entity-info entity-info--deuda">Debe ${formatPEN(hist.saldoPendienteTotal)}</span>` : ''}
-            </div>
-            <div class="entity-actions">
+        <tr>
+            <td>
+                <div class="table-thumb-row">
+                    <div class="table-avatar"><i class='bx bx-user'></i></div>
+                    <div><strong>${c.nombre}</strong><br><small class="muted">${c.tipo}</small></div>
+                </div>
+            </td>
+            <td>${c.documento}</td>
+            <td>${c.telefono || '—'}<br><small class="muted">${c.email || '—'}</small></td>
+            <td>${renderEstrellas(hist.estrellas)}</td>
+            <td><span class="badge-estado badge-estado--${hist.estado}">${hist.estadoTexto}</span></td>
+            <td>${hist.saldoPendienteTotal > 0.01 ? `<span class="entity-info--deuda">${formatPEN(hist.saldoPendienteTotal)}</span>` : '—'}</td>
+            <td class="actions-cell">
                 <button class="btn-small" onclick="abrirHistorialCrediticio(${c.id})">Ver historial</button>
                 <button class="btn-small-outline" onclick="editarCliente(${c.id})">Editar</button>
                 <button class="btn-small-danger" onclick="eliminarCliente(${c.id})">Eliminar</button>
-            </div>
-        </div>
+            </td>
+        </tr>
     `;
     }).join('');
 }
