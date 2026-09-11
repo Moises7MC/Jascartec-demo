@@ -681,25 +681,35 @@ img {
   gap: .75rem;
   margin-top: 1rem;
 }
-.pagination__info { font-size: var(--small-font-size); color: var(--text-color-light); }
-.pagination__nav { display: flex; align-items: center; gap: .3rem; }
-.pagination__arrow, .pagination__num {
-  min-width: 32px; height: 32px;
-  padding: 0 .5rem;
-  border-radius: .6rem;
+.pagination__left { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.pagination__ver { display: flex; align-items: center; gap: .5rem; font-size: var(--small-font-size); color: var(--text-color-light); }
+.pagination__ver select {
   border: 1px solid var(--border-color);
+  border-radius: .6rem;
+  padding: .35rem .6rem;
+  font-size: var(--small-font-size);
+  font-weight: var(--font-medium);
+  color: var(--text-color);
   background: var(--body-color);
+}
+.pagination__info { font-size: var(--small-font-size); color: var(--text-color-light); }
+.pagination__nav { display: flex; align-items: center; gap: .35rem; }
+.pagination__arrow, .pagination__num {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--container-color);
   color: var(--text-color);
   font-size: var(--small-font-size);
   font-weight: var(--font-medium);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  transition: background .15s, color .15s, border-color .15s;
+  transition: background .15s, color .15s, transform .15s;
 }
-.pagination__arrow:hover:not(:disabled), .pagination__num:hover:not(.active) { background: var(--container-color); }
-.pagination__arrow:disabled { opacity: .4; cursor: not-allowed; }
-.pagination__num.active { background: var(--first-color); border-color: var(--first-color); color: #fff; }
-.pagination__ellipsis { color: var(--text-color-light); padding: 0 .2rem; }
+.pagination__arrow:hover:not(:disabled), .pagination__num:hover:not(.active) { background: var(--first-color-light); color: var(--first-color-alt); }
+.pagination__arrow:disabled { opacity: .35; cursor: not-allowed; }
+.pagination__num.active { background: var(--first-color); color: #fff; }
+.pagination__ellipsis { color: var(--text-color-light); padding: 0 .1rem; }
 
 /*=============== TAGS ===============*/
 .tag {

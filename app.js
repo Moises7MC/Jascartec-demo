@@ -2579,8 +2579,10 @@ async function eliminarCliente(id) {
     }
 }
 
-// Página actual de la tabla de Clientes; vuelve a 1 cada vez que cambia una búsqueda/filtro/tamaño.
+// Página actual y tamaño de página de la tabla de Clientes; vuelven a 1 cada vez que cambia
+// una búsqueda/filtro, y clientesPagina también vuelve a 1 si cambia clientesPorPagina.
 let clientesPagina = 1;
+let clientesPorPagina = 25;
 
 function renderClientes() {
     if (!clientes.length) {
@@ -2607,7 +2609,7 @@ function renderClientes() {
         return;
     }
 
-    const porPagina = parseInt($('#cliPorPagina').value) || 25;
+    const porPagina = clientesPorPagina;
     const totalPaginas = Math.max(1, Math.ceil(lista.length / porPagina));
     if (clientesPagina > totalPaginas) clientesPagina = totalPaginas;
     const inicio = (clientesPagina - 1) * porPagina;
@@ -2637,7 +2639,10 @@ function renderClientes() {
     `;
     }).join('');
 
-    renderPaginacion('clientesPaginacion', lista.length, clientesPagina, porPagina, 'cambiarPaginaClientes');
+    renderPaginacion('clientesPaginacion', {
+        total: lista.length, pagina: clientesPagina, porPagina,
+        onCambiarPagina: 'cambiarPaginaClientes', onCambiarPorPagina: 'cambiarPorPaginaClientes'
+    });
 }
 
 function cambiarPaginaClientes(pagina) {
@@ -2645,15 +2650,21 @@ function cambiarPaginaClientes(pagina) {
     renderClientes();
 }
 
+function cambiarPorPaginaClientes(valor) {
+    clientesPorPagina = parseInt(valor) || 25;
+    clientesPagina = 1;
+    renderClientes();
+}
+
 $('#cliSearch').addEventListener('input', () => { clientesPagina = 1; renderClientes(); });
 $('#cliFiltroEstado').addEventListener('change', () => { clientesPagina = 1; renderClientes(); });
 $('#cliFiltroEstrellas').addEventListener('change', () => { clientesPagina = 1; renderClientes(); });
-$('#cliPorPagina').addEventListener('change', () => { clientesPagina = 1; renderClientes(); });
 
-// Pie de página reutilizable para cualquier tabla paginada: "Mostrando X–Y de Z" + números de
-// página (con "…" cuando hay muchas) + flechas anterior/siguiente. onCambiarPaginaFn es el
-// nombre (string) de la función global a llamar con el número de página elegido.
-function renderPaginacion(elId, total, pagina, porPagina, onCambiarPaginaFn) {
+// Pie de página reutilizable para cualquier tabla paginada: a la izquierda el combo "Ver X" (tamaño
+// de página) + "Mostrando X–Y de Z"; a la derecha los botones redondos de navegación (primera
+// página / anterior / números, con "…" si hay muchas / siguiente / última). onCambiarPagina y
+// onCambiarPorPagina son los nombres (string) de las funciones globales a invocar.
+function renderPaginacion(elId, { total, pagina, porPagina, opciones = [25, 50, 100], onCambiarPagina, onCambiarPorPagina }) {
     const el = $(`#${elId}`);
     if (!el) return;
     const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
@@ -2661,8 +2672,19 @@ function renderPaginacion(elId, total, pagina, porPagina, onCambiarPaginaFn) {
     const desde = total === 0 ? 0 : (pagina - 1) * porPagina + 1;
     const hasta = Math.min(pagina * porPagina, total);
 
+    const izquierda = `
+        <div class="pagination__left">
+            <span class="pagination__ver">Ver
+                <select onchange="${onCambiarPorPagina}(this.value)">
+                    ${opciones.map(n => `<option value="${n}" ${n === porPagina ? 'selected' : ''}>${n}</option>`).join('')}
+                </select>
+            </span>
+            <span class="pagination__info">Mostrando ${desde}–${hasta} de ${total}</span>
+        </div>
+    `;
+
     if (totalPaginas <= 1) {
-        el.innerHTML = `<span class="pagination__info">Mostrando ${desde}–${hasta} de ${total}</span>`;
+        el.innerHTML = izquierda;
         return;
     }
 
@@ -2675,16 +2697,18 @@ function renderPaginacion(elId, total, pagina, porPagina, onCambiarPaginaFn) {
     let anterior = 0;
     paginasAMostrar.forEach(p => {
         if (p - anterior > 1) botones += `<span class="pagination__ellipsis">…</span>`;
-        botones += `<button type="button" class="pagination__num${p === pagina ? ' active' : ''}" onclick="${onCambiarPaginaFn}(${p})">${p}</button>`;
+        botones += `<button type="button" class="pagination__num${p === pagina ? ' active' : ''}" onclick="${onCambiarPagina}(${p})">${p}</button>`;
         anterior = p;
     });
 
     el.innerHTML = `
-        <span class="pagination__info">Mostrando ${desde}–${hasta} de ${total}</span>
+        ${izquierda}
         <div class="pagination__nav">
-            <button type="button" class="pagination__arrow" ${pagina <= 1 ? 'disabled' : ''} onclick="${onCambiarPaginaFn}(${pagina - 1})"><i class='bx bx-chevron-left'></i></button>
+            <button type="button" class="pagination__arrow" ${pagina <= 1 ? 'disabled' : ''} onclick="${onCambiarPagina}(1)"><i class='bx bx-chevrons-left'></i></button>
+            <button type="button" class="pagination__arrow" ${pagina <= 1 ? 'disabled' : ''} onclick="${onCambiarPagina}(${pagina - 1})"><i class='bx bx-chevron-left'></i></button>
             ${botones}
-            <button type="button" class="pagination__arrow" ${pagina >= totalPaginas ? 'disabled' : ''} onclick="${onCambiarPaginaFn}(${pagina + 1})"><i class='bx bx-chevron-right'></i></button>
+            <button type="button" class="pagination__arrow" ${pagina >= totalPaginas ? 'disabled' : ''} onclick="${onCambiarPagina}(${pagina + 1})"><i class='bx bx-chevron-right'></i></button>
+            <button type="button" class="pagination__arrow" ${pagina >= totalPaginas ? 'disabled' : ''} onclick="${onCambiarPagina}(${totalPaginas})"><i class='bx bx-chevrons-right'></i></button>
         </div>
     `;
 }
