@@ -567,13 +567,16 @@ img {
 /*=============== STATS GRID ===============*/
 .stats-grid {
   display: grid;
-  /* A ~440px mínimo, 6 tarjetas suelen acomodarse en 3+3 en una pantalla de escritorio típica
-     (y hasta 4-5 por fila en monitores muy anchos); en ventanas angostas cae a 2 o 1 por fila
-     sola — sigue siendo un grid adaptable, no una grilla fija. */
-  grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+  /* 3 columnas fijas (6 tarjetas = 3+3) en vez de auto-fit: con auto-fit, cuántas entraban por
+     fila dependía del ancho exacto de la ventana y variaba de una laptop a otra. Con columnas
+     fijas se ve igual siempre en pantallas de escritorio, y los @media de abajo la adaptan en
+     ventanas angostas (tablet/celular). */
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   margin-bottom: 1.75rem;
 }
+@media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .stats-grid { grid-template-columns: 1fr; } }
 .stats-grid--compact { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 
 .stat-card {
