@@ -12,7 +12,9 @@ const $$ = (sel) => document.querySelectorAll(sel);
 
 const STOCK_MINIMO = 3; // umbral fijo para alertar "stock bajo" por modelo
 
-const formatPEN = (n) => `S/ ${Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+// Espacio "irrompible" ( ) entre "S/" y el número: si fuera un espacio normal, el navegador
+// puede partir la línea justo ahí en una columna angosta y dejar el símbolo y el número apilados.
+const formatPEN = (n) => `S/ ${Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 const formatDate = (str) => {
     if (!str) return '—';
     const d = new Date(str + 'T00:00:00');
