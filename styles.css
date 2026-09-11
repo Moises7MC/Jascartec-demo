@@ -567,7 +567,10 @@ img {
 /*=============== STATS GRID ===============*/
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  /* A ~440px mínimo, 6 tarjetas suelen acomodarse en 3+3 en una pantalla de escritorio típica
+     (y hasta 4-5 por fila en monitores muy anchos); en ventanas angostas cae a 2 o 1 por fila
+     sola — sigue siendo un grid adaptable, no una grilla fija. */
+  grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
   gap: 1rem;
   margin-bottom: 1.75rem;
 }
@@ -598,6 +601,7 @@ img {
 .stat-card__icon--dark { background: var(--black-color); }
 .stat-card__icon--red { background: var(--error-color); }
 .stat-card__icon--amber { background: var(--amber-color); }
+.stat-card__icon--purple { background: hsl(262, 47%, 55%); }
 
 .stat-card__label { font-size: var(--smaller-font-size); color: var(--text-color-light); }
 .stat-card__value { font-size: 1.5rem; font-weight: var(--font-bold); color: var(--title-color); }

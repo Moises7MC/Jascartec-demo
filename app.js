@@ -454,6 +454,7 @@ function openModal(id) {
     }
     if (id === 'modalStockBajo') { $('#stockBajoFiltroCategoria').value = ''; renderStockBajoModal(); }
     if (id === 'modalCobranzasPorVencer') renderCobranzasPorVencerModal();
+    if (id === 'modalCuotasHoy') { $('#cuotasHoyFecha').value = today(); renderCuotasHoyModal(); }
 }
 function closeModal(id) {
     $(`#${id}`).classList.remove('active');
@@ -519,6 +520,8 @@ function renderDashboard() {
 
     const cobranzas = ventasActivas().filter(v => v.formaPago === 'Crédito' && !ventaEstaPagada(v) && diasParaVencer(v.fechaPagoAcordada) <= DIAS_ALERTA_VENCIMIENTO).length;
     $('#statCobranzas').textContent = cobranzas;
+
+    $('#statCuotasHoy').textContent = cuotasQueVencenEn(today()).length;
 }
 
 function initCharts() {
@@ -2978,6 +2981,44 @@ function renderCobranzasPorVencerModal() {
         `;
     }).join('');
 }
+
+// Todas las cuotas (de cualquier venta a crédito activa) cuyo vencimiento cae justo en
+// fechaISO (YYYY-MM-DD) y que todavía no fueron pagadas — el backend ya marca cada cuota
+// del cronograma con "pagada" según los abonos registrados hasta hoy.
+function cuotasQueVencenEn(fechaISO) {
+    const resultado = [];
+    ventasActivas().forEach(v => {
+        if (v.formaPago !== 'Crédito') return;
+        (v.cuotas || []).forEach(c => {
+            if (!c.pagada && c.fechaVencimiento === fechaISO) resultado.push({ venta: v, cuota: c });
+        });
+    });
+    return resultado.sort((a, b) => nombreClienteVenta(a.venta).localeCompare(nombreClienteVenta(b.venta)));
+}
+
+function renderCuotasHoyModal() {
+    const fecha = $('#cuotasHoyFecha').value || today();
+    const items = cuotasQueVencenEn(fecha);
+    const esHoy = fecha === today();
+
+    if (!items.length) {
+        $('#cuotasHoyList').innerHTML = `<div class="empty-state">✨ Nadie tiene una cuota que vencer ${esHoy ? 'hoy' : `el ${formatDate(fecha)}`}</div>`;
+        return;
+    }
+    $('#cuotasHoyList').innerHTML = items.map(({ venta: v, cuota: c }) => `
+        <div class="list-item">
+            <div class="list-item__top">
+                <div><div class="list-item__name">${nombreClienteVenta(v)} — ${v.numBoleta}</div><div class="list-item__meta">Cuota ${c.numero} de ${v.cuotas.length}</div></div>
+                <span class="tag tag-amber">${formatPEN(c.monto)}</span>
+            </div>
+            <div class="list-item__bottom">
+                <span>Saldo total: <strong>${formatPEN(ventaSaldoPendiente(v))}</strong></span>
+                <button class="btn-small" onclick="closeModal('modalCuotasHoy'); abrirGestionPago(${v.id})">Gestionar pago</button>
+            </div>
+        </div>
+    `).join('');
+}
+$('#cuotasHoyFecha').addEventListener('change', renderCuotasHoyModal);
 
 // ===================== CONFIGURACIÓN =====================
 // La base de datos real vive en el servidor; esto solo descarga una foto de

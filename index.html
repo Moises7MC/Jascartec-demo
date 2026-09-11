@@ -201,6 +201,11 @@
                             <span class="stat-card__label">Cobranzas por vencer</span>
                             <span class="stat-card__value" id="statCobranzas">0</span>
                         </div>
+                        <div class="stat-card stat-card--alert" id="cardCuotasHoy" onclick="openModal('modalCuotasHoy')">
+                            <div class="stat-card__icon stat-card__icon--purple"><i class='bx bx-calendar-check'></i></div>
+                            <span class="stat-card__label">Cuotas a pagar hoy</span>
+                            <span class="stat-card__value" id="statCuotasHoy">0</span>
+                        </div>
                     </div>
 
                     <div class="dashboard-grid">
@@ -1319,6 +1324,23 @@
                 <button class="modal__close" onclick="closeModal('modalCobranzasPorVencer')"><i class='bx bx-x'></i></button>
             </div>
             <div class="modal__body list-modal" id="cobranzasPorVencerList"></div>
+        </div>
+    </div>
+
+    <!-- Cuotas a pagar (hoy o en la fecha elegida) -->
+    <div class="modal" id="modalCuotasHoy">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Cuotas a pagar</h3>
+                <button class="modal__close" onclick="closeModal('modalCuotasHoy')"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal__body">
+                <div class="form-group">
+                    <label>Ver cuotas que vencen el</label>
+                    <input type="date" id="cuotasHoyFecha">
+                </div>
+                <div class="list-modal" id="cuotasHoyList" style="margin-top:1rem;"></div>
+            </div>
         </div>
     </div>
 
