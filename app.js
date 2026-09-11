@@ -1241,6 +1241,7 @@ function actualizarHistorialClienteVenta() {
         ? `<div class="historial-compacto historial-compacto--sin-historial">${renderEstrellas(null)}<span class="badge-estado badge-estado--sin-historial">${hist.estadoTexto}</span><span class="historial-compacto__recomendacion">${c.nombre} todavía no tiene historial de créditos.</span></div>`
         : `<div class="historial-compacto historial-compacto--${hist.estado}">
                 ${renderEstrellas(hist.estrellas)}
+                ${renderNivelCliente(hist.estrellas)}
                 <span class="badge-estado badge-estado--${hist.estado}">${hist.estadoTexto}</span>
                 <span class="historial-compacto__recomendacion">${hist.recomendacion}</span>
                 <button type="button" class="btn-small-outline" onclick="abrirHistorialCrediticio(${clienteId})">Ver historial completo</button>
@@ -2469,6 +2470,15 @@ function renderEstrellas(n) {
     return html;
 }
 
+// Nivel en palabras, además de las estrellas: 5=VIP, 4=BUENO, 3=MEDIO, 1-2=MALO. El 1-2 va junto
+// porque son las mismas estrellas a las que un moroso activo está topado (nunca "MEDIO", siempre "MALO").
+function renderNivelCliente(estrellas) {
+    if (estrellas === null || estrellas === undefined) return '';
+    const niveles = { 5: ['VIP', 'vip'], 4: ['BUENO', 'bueno'], 3: ['MEDIO', 'medio'] };
+    const [texto, clase] = niveles[estrellas] || ['MALO', 'malo'];
+    return `<div class="nivel-cliente nivel-cliente--${clase}">${texto}</div>`;
+}
+
 // Tabla de compras del cliente, reutilizada tanto en el modal completo como (implícitamente)
 // para armar los números del resumen.
 function tablaComprasCliente(hist) {
@@ -2510,6 +2520,7 @@ function abrirHistorialCrediticio(clienteId) {
     const resumen = hist.tieneHistorial ? `
         <div class="historial-resumen historial-resumen--${hist.estado}">
             ${renderEstrellas(hist.estrellas)}
+            ${renderNivelCliente(hist.estrellas)}
             <div class="historial-resumen__estado">${hist.estadoTexto}</div>
             <div class="historial-resumen__recomendacion">${hist.recomendacion}</div>
         </div>
@@ -2601,7 +2612,7 @@ function renderClientes() {
             </td>
             <td>${c.documento}</td>
             <td>${c.telefono || '—'}<br><small class="muted">${c.email || '—'}</small></td>
-            <td>${renderEstrellas(hist.estrellas)}</td>
+            <td>${renderEstrellas(hist.estrellas)}${renderNivelCliente(hist.estrellas)}</td>
             <td><span class="badge-estado badge-estado--${hist.estado}">${hist.estadoTexto}</span></td>
             <td>${hist.saldoPendienteTotal > 0.01 ? `<span class="entity-info--deuda">${formatPEN(hist.saldoPendienteTotal)}</span>` : '—'}</td>
             <td class="actions-cell">

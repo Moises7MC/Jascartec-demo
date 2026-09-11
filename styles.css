@@ -703,6 +703,18 @@ img {
 .rating-stars i { line-height: 1; }
 .rating-stars--vacio { font-size: var(--smaller-font-size); color: var(--text-color-light); font-style: italic; }
 
+/* Nivel en palabras debajo de las estrellas: VIP (5★) / BUENO (4★) / MEDIO (3★) / MALO (1-2★) */
+.nivel-cliente {
+  font-size: var(--smaller-font-size);
+  font-weight: var(--font-semi-bold);
+  letter-spacing: .04em;
+  margin-top: .2rem;
+}
+.nivel-cliente--vip { color: hsl(38, 92%, 42%); }
+.nivel-cliente--bueno { color: var(--success-color); }
+.nivel-cliente--medio { color: hsl(30, 80%, 40%); }
+.nivel-cliente--malo { color: var(--error-color); }
+
 .badge-estado {
   display: inline-flex;
   align-items: center;
