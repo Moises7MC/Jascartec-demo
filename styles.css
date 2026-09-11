@@ -716,6 +716,11 @@ img {
 .entity-info--deuda { color: var(--error-color); font-weight: var(--font-medium); }
 .entity-actions { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
 
+/* La columna Estado de la tabla de Clientes es angosta a propósito (le cedimos ese espacio
+   a Cliente); un badge largo como "Atrasos leves (regularizado)" pasa a una 2da línea en vez
+   de forzar la columna a ensancharse. */
+.table--clientes .badge-estado { white-space: normal; text-align: center; line-height: 1.25; }
+
 /*=============== HISTORIAL CREDITICIO (Clientes / Registrar Venta) ===============*/
 .entity-credito { display: flex; flex-direction: column; align-items: flex-start; gap: .4rem; margin: .3rem 0; }
 
