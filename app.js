@@ -2933,7 +2933,7 @@ function renderStockBajoModal() {
         const cant = stockDisponible(p.id);
         const est = estadoStock(cant);
         return `
-            <div class="list-item list-item--clickable" onclick="irAInventarioDesdeStockBajo(${p.id})">
+            <div class="list-item list-item--clickable" onclick="irARegistrarIngresoDesdeStockBajo(${p.id})">
                 <div class="list-item__top">
                     <div><div class="list-item__name">${nombreProducto(p)}</div><div class="list-item__meta">${p.categoria} · ${p.codigo}</div></div>
                     <span class="tag ${est.tag}">${cant} disponibles</span>
@@ -2944,14 +2944,19 @@ function renderStockBajoModal() {
 }
 $('#stockBajoFiltroCategoria').addEventListener('change', renderStockBajoModal);
 
-// Clic en un modelo dentro de "Modelos con stock bajo": cierra el modal y lo lleva a Inventario
-// ya buscado, para que agregue stock (vía Editar o un nuevo Ingreso) sin tener que ubicarlo a mano.
-function irAInventarioDesdeStockBajo(productoId) {
+// Clic en un modelo dentro de "Modelos con stock bajo": cierra el modal, va a Ingresos y abre
+// "Registrar Ingreso" con la categoría y el modelo ya elegidos, listo para que solo complete
+// IMEI/cantidad y costo y confirme — sin tener que ubicar el modelo a mano entre todos.
+function irARegistrarIngresoDesdeStockBajo(productoId) {
     const p = findProducto(productoId);
     if (!p) return;
     closeModal('modalStockBajo');
-    $('#invSearch').value = p.codigo || nombreProducto(p);
-    switchView('inventario'); // ya renderiza Inventario solo, con la búsqueda puesta arriba
+    switchView('ingresos');
+    openModal('modalIngreso');
+    $('#ingCategoria').value = p.categoriaId;
+    populateSelectProductosIngreso();
+    $('#ingProducto').value = p.id;
+    toggleCampoImeiIngreso();
 }
 
 function renderCobranzasPorVencerModal() {
