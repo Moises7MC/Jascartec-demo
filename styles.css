@@ -460,6 +460,26 @@ img {
 }
 .btn-icon:hover { background: hsl(0, 79%, 95%); }
 
+/* Acciones por icono (tabla de Clientes): un color propio por acción, con un pequeño
+   "levantón" y sombra al pasar el mouse para que se sientan interactivos. */
+.actions-icons { display: flex; gap: .45rem; }
+.btn-icon-action {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.05rem;
+  border: none;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease;
+}
+.btn-icon-action:hover { transform: translateY(-2px); }
+.btn-icon-action--historial { background: hsl(199, 92%, 93%); color: hsl(199, 89%, 40%); }
+.btn-icon-action--historial:hover { background: hsl(199, 89%, 40%); color: #fff; box-shadow: 0 4px 10px hsla(199, 89%, 40%, .35); }
+.btn-icon-action--editar { background: hsl(38, 92%, 93%); color: hsl(30, 80%, 40%); }
+.btn-icon-action--editar:hover { background: hsl(30, 80%, 40%); color: #fff; box-shadow: 0 4px 10px hsla(30, 80%, 40%, .35); }
+.btn-icon-action--eliminar { background: hsl(0, 79%, 95%); color: var(--error-color); }
+.btn-icon-action--eliminar:hover { background: var(--error-color); color: #fff; box-shadow: 0 4px 10px hsla(0, 79%, 55%, .35); }
+
 /*=============== TOOLBAR / FILTERS ===============*/
 .toolbar {
   display: flex;
