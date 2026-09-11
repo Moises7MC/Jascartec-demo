@@ -437,6 +437,7 @@ function openModal(id) {
         $('#modalCategoriaTitle').textContent = 'Nueva Categoría';
         $('#catId').value = '';
         $('#formCategoria').reset();
+        actualizarDisponibilidadImeiCategoria();
     }
     if (id === 'modalUsuario') {
         $('#modalUsuarioTitle').textContent = 'Nuevo Usuario';
@@ -915,11 +916,25 @@ function renderMarcas() {
 }
 
 // ===================== CATEGORÍAS =====================
+// El IMEI (número de serie por unidad) es un concepto de celulares — ninguna otra categoría
+// (accesorios, impresoras, laptops, ni una que se cree después) debería poder activarlo, así
+// el vendedor nunca termina registrando por accidente "impresoras" o "laptops" por IMEI.
+const esNombreCelulares = (nombre) => (nombre || '').trim().toLowerCase() === 'celulares';
+
+function actualizarDisponibilidadImeiCategoria() {
+    const permitido = esNombreCelulares($('#catNombre').value);
+    $('#catRequiereImei').disabled = !permitido;
+    if (!permitido) $('#catRequiereImei').checked = false;
+    $('#catImeiRestriccion').style.display = permitido ? 'none' : '';
+}
+
 $('#formCategoria').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = $('#catId').value;
     const nombre = $('#catNombre').value.trim();
-    const requiereImei = $('#catRequiereImei').checked;
+    // Defensa extra además del checkbox deshabilitado: si por algún motivo llegó marcado
+    // y el nombre no es "Celulares", igual se guarda como false.
+    const requiereImei = $('#catRequiereImei').checked && esNombreCelulares(nombre);
 
     try {
         if (id) {
@@ -945,6 +960,7 @@ function editarCategoria(id) {
     $('#catId').value = c.id;
     $('#catNombre').value = c.nombre;
     $('#catRequiereImei').checked = c.requiereImei;
+    actualizarDisponibilidadImeiCategoria();
 }
 
 async function eliminarCategoria(id) {

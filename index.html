@@ -1185,13 +1185,14 @@
                 <input type="hidden" id="catId">
                 <div class="form-group">
                     <label>Nombre</label>
-                    <input type="text" id="catNombre" required placeholder="Ej: Accesorios">
+                    <input type="text" id="catNombre" required placeholder="Ej: Accesorios" oninput="actualizarDisponibilidadImeiCategoria()">
                 </div>
                 <label class="form-check">
                     <input type="checkbox" id="catRequiereImei">
-                    <span>Requiere número de serie/IMEI por unidad (como Celulares)</span>
+                    <span>Requiere número de serie/IMEI por unidad</span>
                 </label>
                 <small class="muted">Si no la marca, el stock de esta categoría se controla por cantidad simple (ideal para accesorios, carcasas, etc.).</small>
+                <small class="muted" id="catImeiRestriccion" style="display:none; color:var(--error-color);">El IMEI solo está disponible para la categoría "Celulares" — el resto siempre se controla por cantidad.</small>
                 <button type="submit" class="btn btn--primary btn--full">Guardar Categoría</button>
             </form>
         </div>
