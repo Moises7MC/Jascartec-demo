@@ -672,6 +672,35 @@ img {
 }
 .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--text-color-light); font-size: var(--small-font-size); }
 
+/*=============== PAGINACIÓN (pie de tabla) ===============*/
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-top: 1rem;
+}
+.pagination__info { font-size: var(--small-font-size); color: var(--text-color-light); }
+.pagination__nav { display: flex; align-items: center; gap: .3rem; }
+.pagination__arrow, .pagination__num {
+  min-width: 32px; height: 32px;
+  padding: 0 .5rem;
+  border-radius: .6rem;
+  border: 1px solid var(--border-color);
+  background: var(--body-color);
+  color: var(--text-color);
+  font-size: var(--small-font-size);
+  font-weight: var(--font-medium);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.pagination__arrow:hover:not(:disabled), .pagination__num:hover:not(.active) { background: var(--container-color); }
+.pagination__arrow:disabled { opacity: .4; cursor: not-allowed; }
+.pagination__num.active { background: var(--first-color); border-color: var(--first-color); color: #fff; }
+.pagination__ellipsis { color: var(--text-color-light); padding: 0 .2rem; }
+
 /*=============== TAGS ===============*/
 .tag {
   display: inline-flex;

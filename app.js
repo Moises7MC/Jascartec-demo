@@ -2579,9 +2579,13 @@ async function eliminarCliente(id) {
     }
 }
 
+// Página actual de la tabla de Clientes; vuelve a 1 cada vez que cambia una búsqueda/filtro/tamaño.
+let clientesPagina = 1;
+
 function renderClientes() {
     if (!clientes.length) {
         $('#clientesBody').innerHTML = '<tr><td colspan="7" class="empty-state">Aún no ha registrado clientes</td></tr>';
+        $('#clientesPaginacion').innerHTML = '';
         return;
     }
 
@@ -2599,10 +2603,17 @@ function renderClientes() {
 
     if (!lista.length) {
         $('#clientesBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron clientes con esos filtros</td></tr>';
+        $('#clientesPaginacion').innerHTML = '';
         return;
     }
 
-    $('#clientesBody').innerHTML = lista.map(c => {
+    const porPagina = parseInt($('#cliPorPagina').value) || 25;
+    const totalPaginas = Math.max(1, Math.ceil(lista.length / porPagina));
+    if (clientesPagina > totalPaginas) clientesPagina = totalPaginas;
+    const inicio = (clientesPagina - 1) * porPagina;
+    const listaPagina = lista.slice(inicio, inicio + porPagina);
+
+    $('#clientesBody').innerHTML = listaPagina.map(c => {
         const hist = historiales.get(c.id);
         return `
         <tr>
@@ -2625,10 +2636,58 @@ function renderClientes() {
         </tr>
     `;
     }).join('');
+
+    renderPaginacion('clientesPaginacion', lista.length, clientesPagina, porPagina, 'cambiarPaginaClientes');
 }
-$('#cliSearch').addEventListener('input', renderClientes);
-$('#cliFiltroEstado').addEventListener('change', renderClientes);
-$('#cliFiltroEstrellas').addEventListener('change', renderClientes);
+
+function cambiarPaginaClientes(pagina) {
+    clientesPagina = pagina;
+    renderClientes();
+}
+
+$('#cliSearch').addEventListener('input', () => { clientesPagina = 1; renderClientes(); });
+$('#cliFiltroEstado').addEventListener('change', () => { clientesPagina = 1; renderClientes(); });
+$('#cliFiltroEstrellas').addEventListener('change', () => { clientesPagina = 1; renderClientes(); });
+$('#cliPorPagina').addEventListener('change', () => { clientesPagina = 1; renderClientes(); });
+
+// Pie de página reutilizable para cualquier tabla paginada: "Mostrando X–Y de Z" + números de
+// página (con "…" cuando hay muchas) + flechas anterior/siguiente. onCambiarPaginaFn es el
+// nombre (string) de la función global a llamar con el número de página elegido.
+function renderPaginacion(elId, total, pagina, porPagina, onCambiarPaginaFn) {
+    const el = $(`#${elId}`);
+    if (!el) return;
+    const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
+    pagina = Math.min(Math.max(1, pagina), totalPaginas);
+    const desde = total === 0 ? 0 : (pagina - 1) * porPagina + 1;
+    const hasta = Math.min(pagina * porPagina, total);
+
+    if (totalPaginas <= 1) {
+        el.innerHTML = `<span class="pagination__info">Mostrando ${desde}–${hasta} de ${total}</span>`;
+        return;
+    }
+
+    // Siempre se muestran la 1ra, la última y una a cada lado de la actual; el resto son "…".
+    const paginasAMostrar = [...new Set([1, totalPaginas, pagina - 1, pagina, pagina + 1])]
+        .filter(p => p >= 1 && p <= totalPaginas)
+        .sort((a, b) => a - b);
+
+    let botones = '';
+    let anterior = 0;
+    paginasAMostrar.forEach(p => {
+        if (p - anterior > 1) botones += `<span class="pagination__ellipsis">…</span>`;
+        botones += `<button type="button" class="pagination__num${p === pagina ? ' active' : ''}" onclick="${onCambiarPaginaFn}(${p})">${p}</button>`;
+        anterior = p;
+    });
+
+    el.innerHTML = `
+        <span class="pagination__info">Mostrando ${desde}–${hasta} de ${total}</span>
+        <div class="pagination__nav">
+            <button type="button" class="pagination__arrow" ${pagina <= 1 ? 'disabled' : ''} onclick="${onCambiarPaginaFn}(${pagina - 1})"><i class='bx bx-chevron-left'></i></button>
+            ${botones}
+            <button type="button" class="pagination__arrow" ${pagina >= totalPaginas ? 'disabled' : ''} onclick="${onCambiarPaginaFn}(${pagina + 1})"><i class='bx bx-chevron-right'></i></button>
+        </div>
+    `;
+}
 
 // ===================== FACTURAS =====================
 function generarLetras() {
