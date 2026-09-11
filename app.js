@@ -1010,8 +1010,17 @@ let ingresoCart = [];
 // o Cantidad (categoría por stock simple) — igual criterio que en Registrar Venta.
 function toggleCampoImeiIngreso() {
     const p = findProducto(parseInt($('#ingProducto').value));
-    const esImei = p ? p.requiereImei : true;
+    let esImei;
+    if (p) {
+        esImei = p.requiereImei;
+    } else {
+        // No hay un modelo válido elegido todavía (ej. "Sin modelos en esta categoría"):
+        // nos guiamos por la categoría de arriba en vez de asumir "por IMEI" a ciegas.
+        const categoria = findCategoria(parseInt($('#ingCategoria').value));
+        esImei = categoria ? categoria.requiereImei : true;
+    }
     $('#ingImeiWrap').style.display = esImei ? '' : 'none';
+    $('#ingImei2Wrap').style.display = esImei ? '' : 'none';
     $('#ingCantidadWrap').style.display = esImei ? 'none' : '';
 }
 
