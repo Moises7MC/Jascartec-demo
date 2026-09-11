@@ -2616,7 +2616,7 @@ function renderClientes() {
             <td><span class="badge-estado badge-estado--${hist.estado}">${hist.estadoTexto}</span></td>
             <td>${hist.saldoPendienteTotal > 0.01 ? `<span class="entity-info--deuda">${formatPEN(hist.saldoPendienteTotal)}</span>` : '—'}</td>
             <td class="actions-icons">
-                <button class="btn-icon-action btn-icon-action--historial" title="Ver historial" onclick="abrirHistorialCrediticio(${c.id})"><i class="ri-history-line"></i></button>
+                <button class="btn-icon-action btn-icon-action--historial" title="Ver historial" onclick="abrirHistorialCrediticio(${c.id})"><i class="ri-list-unordered"></i></button>
                 <button class="btn-icon-action btn-icon-action--editar" title="Editar" onclick="editarCliente(${c.id})"><i class="ri-pencil-line"></i></button>
                 <button class="btn-icon-action btn-icon-action--eliminar" title="Eliminar" onclick="eliminarCliente(${c.id})"><i class="ri-delete-bin-6-line"></i></button>
             </td>
