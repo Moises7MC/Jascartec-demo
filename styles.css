@@ -1048,6 +1048,15 @@ img {
 .detalle-grid .label { font-size: var(--smaller-font-size); color: var(--text-color-light); margin-bottom: .15rem; }
 .detalle-grid .value { font-weight: var(--font-medium); color: var(--title-color); }
 
+.modal-filtro-select {
+  width: 100%;
+  border: 1.5px solid var(--border-color);
+  border-radius: .75rem;
+  padding: .6rem 1rem;
+  margin-bottom: 1rem;
+  color: var(--title-color);
+  background: var(--body-color);
+}
 .list-modal { display: flex; flex-direction: column; gap: .75rem; max-height: 60vh; overflow-y: auto; }
 .list-item {
   background: var(--container-color);
@@ -1057,6 +1066,8 @@ img {
   flex-direction: column;
   gap: .5rem;
 }
+.list-item--clickable { cursor: pointer; transition: background .15s, transform .15s; }
+.list-item--clickable:hover { background: var(--first-color-light); transform: translateX(2px); }
 .list-item__top, .list-item__bottom { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .list-item__name { font-weight: var(--font-medium); color: var(--title-color); font-size: var(--small-font-size); }
 .list-item__meta { font-size: var(--smaller-font-size); color: var(--text-color-light); }

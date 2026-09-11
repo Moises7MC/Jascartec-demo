@@ -452,7 +452,7 @@ function openModal(id) {
         $('#facLetrasWrapper').style.display = 'none';
         populateSelectProveedores('#facProveedor');
     }
-    if (id === 'modalStockBajo') renderStockBajoModal();
+    if (id === 'modalStockBajo') { $('#stockBajoFiltroCategoria').value = ''; renderStockBajoModal(); }
     if (id === 'modalCobranzasPorVencer') renderCobranzasPorVencerModal();
 }
 function closeModal(id) {
@@ -476,6 +476,7 @@ function populateSelectCategorias() {
     $('#filterCategoria').innerHTML = opciones;
     $('#selectorModeloCategoria').innerHTML = opciones;
     $('#ingFiltroCategoria').innerHTML = opciones;
+    $('#stockBajoFiltroCategoria').innerHTML = opciones;
 }
 function populateSelectCategoriasProducto() {
     $('#prodCategoria').innerHTML = categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
@@ -2917,23 +2918,37 @@ function renderUsuarios() {
 
 // ===================== MODALES: LISTAS =====================
 function renderStockBajoModal() {
-    const items = productos.filter(p => stockDisponible(p.id) <= STOCK_MINIMO);
+    const categoriaFiltro = $('#stockBajoFiltroCategoria').value;
+    let items = productos.filter(p => stockDisponible(p.id) <= STOCK_MINIMO);
+    if (categoriaFiltro) items = items.filter(p => p.categoriaId === parseInt(categoriaFiltro));
+
     if (!items.length) {
-        $('#stockBajoList').innerHTML = '<div class="empty-state">✨ No hay modelos con stock bajo</div>';
+        $('#stockBajoList').innerHTML = `<div class="empty-state">✨ No hay modelos con stock bajo${categoriaFiltro ? ' en esta categoría' : ''}</div>`;
         return;
     }
     $('#stockBajoList').innerHTML = items.map(p => {
         const cant = stockDisponible(p.id);
         const est = estadoStock(cant);
         return `
-            <div class="list-item">
+            <div class="list-item list-item--clickable" onclick="irAInventarioDesdeStockBajo(${p.id})">
                 <div class="list-item__top">
-                    <div><div class="list-item__name">${nombreProducto(p)}</div><div class="list-item__meta">${p.codigo}</div></div>
+                    <div><div class="list-item__name">${nombreProducto(p)}</div><div class="list-item__meta">${p.categoria} · ${p.codigo}</div></div>
                     <span class="tag ${est.tag}">${cant} disponibles</span>
                 </div>
             </div>
         `;
     }).join('');
+}
+$('#stockBajoFiltroCategoria').addEventListener('change', renderStockBajoModal);
+
+// Clic en un modelo dentro de "Modelos con stock bajo": cierra el modal y lo lleva a Inventario
+// ya buscado, para que agregue stock (vía Editar o un nuevo Ingreso) sin tener que ubicarlo a mano.
+function irAInventarioDesdeStockBajo(productoId) {
+    const p = findProducto(productoId);
+    if (!p) return;
+    closeModal('modalStockBajo');
+    $('#invSearch').value = p.codigo || nombreProducto(p);
+    switchView('inventario'); // ya renderiza Inventario solo, con la búsqueda puesta arriba
 }
 
 function renderCobranzasPorVencerModal() {

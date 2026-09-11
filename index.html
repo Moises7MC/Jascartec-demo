@@ -1302,7 +1302,12 @@
                 <h3>Modelos con stock a vencer</h3>
                 <button class="modal__close" onclick="closeModal('modalStockBajo')"><i class='bx bx-x'></i></button>
             </div>
-            <div class="modal__body list-modal" id="stockBajoList"></div>
+            <div class="modal__body">
+                <select id="stockBajoFiltroCategoria" class="modal-filtro-select">
+                    <option value="">Todas las categorías</option>
+                </select>
+                <div class="list-modal" id="stockBajoList"></div>
+            </div>
         </div>
     </div>
 
