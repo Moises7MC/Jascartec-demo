@@ -79,11 +79,11 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ===================== Middleware pipeline =====================
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Swagger habilitado siempre (no solo en Development): sirve para probar la API a mano desde
+// la nube sin herramientas extra. No expone datos sin login — cada endpoint sigue pidiendo el
+// token igual que siempre, esto solo muestra el "menú" de qué se puede llamar.
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseCors(CorsPolicy);
