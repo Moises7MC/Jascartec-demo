@@ -1,0 +1,12 @@
+backend/**/bin/
+backend/**/obj/
+backend/publish_output/
+.git/
+.claude/
+node_modules/
+worker/
+*.docx
+*.jpg
+*.jpeg
+*.png
+*.ico
