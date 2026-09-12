@@ -173,6 +173,14 @@ const tagFormaPago = (v) => {
 const ventaEstaAnulada = (v) => v.estado === 'Anulada';
 const ventasActivas = () => ventas.filter(v => !ventaEstaAnulada(v));
 
+// Mismas ventas/stock de siempre, pero recortadas al "contexto" de sucursal activo en la
+// barra superior (todas, si eligió "Todas las sucursales") — usado en Dashboard y en los
+// modales de detalle de sus tarjetas, para que el número de la tarjeta y lo que se ve al
+// hacer clic en ella siempre hablen exactamente de lo mismo.
+const ventasEnContexto = () => ventas.filter(v => sucursalActualId === 'todas' || v.sucursalId === sucursalActualId);
+const ventasActivasEnContexto = () => ventasEnContexto().filter(v => !ventaEstaAnulada(v));
+const stockEnContexto = (productoId) => sucursalActualId === 'todas' ? stockDisponible(productoId) : stockEnSucursal(productoId, sucursalActualId);
+
 // ===================== FACTURAS: TOTALES =====================
 const facturaMontoPagado = (f) => f.letras.filter(l => l.pagada).reduce((s, l) => s + l.monto, 0);
 const facturaMontoPendiente = (f) => f.montoTotal - facturaMontoPagado(f);
@@ -608,19 +616,22 @@ function populateSelectProductosIngreso() {
 // ===================== DASHBOARD =====================
 let chartVentas = null, chartMarcas = null, chartTopProductos = null, chartFlujoCajaChart = null;
 
+// Con "Todas las sucursales" elegida, todo el Dashboard suma el negocio completo; con una
+// sucursal puntual, cada tarjeta y gráfico muestra solo lo de esa sucursal.
 function renderDashboard() {
-    const disponibles = productos.reduce((s, p) => s + p.stockDisponible, 0);
+    const disponibles = productos.reduce((s, p) => s + stockEnContexto(p.id), 0);
     $('#statEquiposDisponibles').textContent = disponibles;
 
+    const ventasCtx = ventasActivasEnContexto();
     const inicioMes = today().slice(0, 7);
-    const ventasMes = ventasActivas().filter(v => v.fecha.startsWith(inicioMes)).reduce((s, v) => s + ventaTotal(v), 0);
+    const ventasMes = ventasCtx.filter(v => v.fecha.startsWith(inicioMes)).reduce((s, v) => s + ventaTotal(v), 0);
     $('#statVentasMes').textContent = formatPEN(ventasMes);
-    $('#statBoletas').textContent = ventas.length; // incluye anuladas: el correlativo emitido cuenta igual
+    $('#statBoletas').textContent = ventasEnContexto().length; // incluye anuladas: el correlativo emitido cuenta igual
 
-    const stockBajoCount = productos.filter(p => stockDisponible(p.id) <= STOCK_MINIMO).length;
+    const stockBajoCount = productos.filter(p => stockEnContexto(p.id) <= STOCK_MINIMO).length;
     $('#statStockBajo').textContent = stockBajoCount;
 
-    const cobranzas = ventasActivas().filter(v => v.formaPago === 'Crédito' && !ventaEstaPagada(v) && diasParaVencer(v.fechaPagoAcordada) <= DIAS_ALERTA_VENCIMIENTO).length;
+    const cobranzas = ventasCtx.filter(v => v.formaPago === 'Crédito' && !ventaEstaPagada(v) && diasParaVencer(v.fechaPagoAcordada) <= DIAS_ALERTA_VENCIMIENTO).length;
     $('#statCobranzas').textContent = cobranzas;
 
     $('#statCuotasHoy').textContent = cuotasQueVencenEn(today()).length;
@@ -645,7 +656,7 @@ function initCharts() {
         d.setDate(d.getDate() - i);
         dias.push(fechaLocalISO(d));
     }
-    const ventasPorDia = dias.map(d => ventasActivas().filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
+    const ventasPorDia = dias.map(d => ventasActivasEnContexto().filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
 
     chartVentas = new Chart(ctx1, {
         type: 'line',
@@ -657,7 +668,7 @@ function initCharts() {
     });
 
     const porMarca = {};
-    ventasActivas().forEach(v => v.items.forEach(it => {
+    ventasActivasEnContexto().forEach(v => v.items.forEach(it => {
         porMarca[it.marca] = (porMarca[it.marca] || 0) + it.precioUnit;
     }));
     chartMarcas = new Chart(ctx2, {
@@ -670,7 +681,7 @@ function initCharts() {
     });
 
     const porProducto = {};
-    ventasActivas().forEach(v => v.items.forEach(it => {
+    ventasActivasEnContexto().forEach(v => v.items.forEach(it => {
         porProducto[it.productoId] = (porProducto[it.productoId] || 0) + 1;
     }));
     const topEntries = Object.entries(porProducto).sort((a, b) => b[1] - a[1]).slice(0, 6);
@@ -694,16 +705,25 @@ function updateCharts() {
         d.setDate(d.getDate() - i);
         dias.push(fechaLocalISO(d));
     }
-    chartVentas.data.datasets[0].data = dias.map(d => ventas.filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
+    chartVentas.data.datasets[0].data = dias.map(d => ventasActivasEnContexto().filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
     chartVentas.update();
 
     const porMarca = {};
-    ventasActivas().forEach(v => v.items.forEach(it => {
+    ventasActivasEnContexto().forEach(v => v.items.forEach(it => {
         porMarca[it.marca] = (porMarca[it.marca] || 0) + it.precioUnit;
     }));
     chartMarcas.data.labels = Object.keys(porMarca);
     chartMarcas.data.datasets[0].data = Object.values(porMarca);
     chartMarcas.update();
+
+    const porProducto = {};
+    ventasActivasEnContexto().forEach(v => v.items.forEach(it => {
+        porProducto[it.productoId] = (porProducto[it.productoId] || 0) + 1;
+    }));
+    const topEntries = Object.entries(porProducto).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    chartTopProductos.data.labels = topEntries.map(([pid]) => nombreProducto(findProducto(parseInt(pid))));
+    chartTopProductos.data.datasets[0].data = topEntries.map(([, c]) => c);
+    chartTopProductos.update();
 
     renderChartFlujoCaja();
 }
@@ -3352,7 +3372,7 @@ function renderUsuarios() {
 // ===================== MODALES: LISTAS =====================
 function renderStockBajoModal() {
     const categoriaFiltro = $('#stockBajoFiltroCategoria').value;
-    let items = productos.filter(p => stockDisponible(p.id) <= STOCK_MINIMO);
+    let items = productos.filter(p => stockEnContexto(p.id) <= STOCK_MINIMO);
     if (categoriaFiltro) items = items.filter(p => p.categoriaId === parseInt(categoriaFiltro));
 
     if (!items.length) {
@@ -3360,7 +3380,7 @@ function renderStockBajoModal() {
         return;
     }
     $('#stockBajoList').innerHTML = items.map(p => {
-        const cant = stockDisponible(p.id);
+        const cant = stockEnContexto(p.id);
         const est = estadoStock(cant);
         return `
             <div class="list-item list-item--clickable" onclick="irARegistrarIngresoDesdeStockBajo(${p.id})">
@@ -3390,7 +3410,7 @@ function irARegistrarIngresoDesdeStockBajo(productoId) {
 }
 
 function renderCobranzasPorVencerModal() {
-    const items = ventasActivas()
+    const items = ventasActivasEnContexto()
         .filter(v => v.formaPago === 'Crédito' && !ventaEstaPagada(v))
         .map(v => ({ venta: v, dias: diasParaVencer(v.fechaPagoAcordada) }))
         .filter(x => x.dias <= DIAS_ALERTA_VENCIMIENTO)
@@ -3422,7 +3442,7 @@ function renderCobranzasPorVencerModal() {
 // del cronograma con "pagada" según los abonos registrados hasta hoy.
 function cuotasQueVencenEn(fechaISO) {
     const resultado = [];
-    ventasActivas().forEach(v => {
+    ventasActivasEnContexto().forEach(v => {
         if (v.formaPago !== 'Crédito') return;
         (v.cuotas || []).forEach(c => {
             if (!c.pagada && c.fechaVencimiento === fechaISO) resultado.push({ venta: v, cuota: c });
