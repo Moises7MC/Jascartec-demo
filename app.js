@@ -1262,7 +1262,9 @@ function renderIngresos() {
     const desde = $('#ingDesde').value;
     const hasta = $('#ingHasta').value;
 
-    let lista = [...ingresos].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+    // Igual que Inventario y Ventas: la lista se filtra por la sucursal elegida arriba.
+    let lista = ingresos.filter(i => i.sucursalId === sucursalActualId)
+        .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
     if (busqueda) {
         lista = lista.filter(i => {
             const texto = `${i.numeroFactura || ''} ${i.proveedor} ${i.equipos.map(e => `${e.imei} ${e.imei2 || ''}`).join(' ')}`.toLowerCase();
@@ -1281,7 +1283,7 @@ function renderIngresos() {
     }
 
     if (!lista.length) {
-        $('#ingresosBody').innerHTML = '<tr><td colspan="8" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
+        $('#ingresosBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
         return;
     }
     $('#ingresosBody').innerHTML = lista.map(i => {
@@ -1291,7 +1293,6 @@ function renderIngresos() {
             <tr>
                 <td>${formatDate(i.fecha)}</td>
                 <td>${i.proveedor}</td>
-                <td>${i.sucursal}</td>
                 <td>${i.numeroFactura || '—'}</td>
                 <td>${cantLineas}</td>
                 <td>${formatPEN(total)}</td>
@@ -1939,13 +1940,15 @@ async function registrarAbono(ventaId) {
 
 function renderVentas() {
     if (!ventas.length) {
-        $('#ventasBody').innerHTML = '<tr><td colspan="7" class="empty-state">Aún no hay ventas registradas</td></tr>';
+        $('#ventasBody').innerHTML = '<tr><td colspan="6" class="empty-state">Aún no hay ventas registradas</td></tr>';
         return;
     }
 
-    // Los totales/estadísticas de dinero SIEMPRE cuentan solo las ventas activas,
-    // sin importar qué se esté buscando o filtrando en la tabla de abajo.
-    const activas = ventasActivas();
+    // Tanto las tarjetas de arriba como la tabla se filtran por la sucursal elegida en la
+    // barra superior — igual que Inventario, para que Ventas siempre muestre "lo de esta
+    // tienda", no el negocio completo mezclado.
+    const ventasSucursal = ventas.filter(v => v.sucursalId === sucursalActualId);
+    const activas = ventasSucursal.filter(v => !ventaEstaAnulada(v));
     const totalFacturado = activas.reduce((s, v) => s + ventaTotal(v), 0);
     $('#ventasTotalFacturado').textContent = formatPEN(totalFacturado);
     $('#ventasTicketProm').textContent = formatPEN(activas.length ? totalFacturado / activas.length : 0);
@@ -1957,11 +1960,11 @@ function renderVentas() {
     const topId = Object.entries(conteoProducto).sort((a, b) => b[1] - a[1])[0]?.[0];
     $('#ventasProductoTop').textContent = topId ? nombreProducto(findProducto(parseInt(topId))) : '—';
 
-    // La tabla sí respeta el buscador y el filtro de estado (Activas/Anuladas/Todas).
+    // La tabla además respeta el buscador y el filtro de estado (Activas/Anuladas/Todas).
     const busqueda = ($('#venSearch').value || '').trim().toLowerCase();
     const filtroEstado = $('#venFiltroEstado').value;
 
-    let lista = [...ventas].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+    let lista = [...ventasSucursal].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
     if (filtroEstado === 'activas') lista = lista.filter(v => !ventaEstaAnulada(v));
     else if (filtroEstado === 'anuladas') lista = lista.filter(v => ventaEstaAnulada(v));
 
@@ -1973,7 +1976,7 @@ function renderVentas() {
     }
 
     if (!lista.length) {
-        $('#ventasBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron ventas con esos filtros</td></tr>';
+        $('#ventasBody').innerHTML = '<tr><td colspan="6" class="empty-state">No se encontraron ventas con esos filtros</td></tr>';
         return;
     }
 
@@ -1984,7 +1987,6 @@ function renderVentas() {
             <tr style="${anulada ? 'opacity:.55;' : ''}">
                 <td><strong style="${anulada ? 'text-decoration:line-through;' : ''}">${v.numBoleta}</strong></td>
                 <td>${formatDate(v.fecha)} <small class="muted">${formatHora(v.creadoEn)}</small></td>
-                <td>${v.sucursal}</td>
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.items.length}</td>
                 <td>${formatPEN(ventaTotal(v))}</td>
@@ -2545,18 +2547,18 @@ $('#formMovimientoCaja').addEventListener('submit', async (e) => {
 async function cargarHistorialCaja() {
     let historial = [];
     try {
-        historial = await api.get('/caja');
+        // Igual que Inventario/Ventas/Ingresos: el historial se filtra por la sucursal elegida.
+        historial = await api.get(`/caja?sucursalId=${sucursalActualId}`);
     } catch (err) {
         historial = [];
     }
     if (!historial.length) {
-        $('#cajaHistorialBody').innerHTML = '<tr><td colspan="9" class="empty-state">Todavía no se registró ninguna caja</td></tr>';
+        $('#cajaHistorialBody').innerHTML = '<tr><td colspan="8" class="empty-state">Todavía no se registró ninguna caja</td></tr>';
         return;
     }
     $('#cajaHistorialBody').innerHTML = historial.map(c => `
         <tr>
             <td>${formatDateLong(c.fecha)}</td>
-            <td>${c.sucursal}</td>
             <td>${c.usuarioApertura}</td>
             <td>${formatPEN(c.montoInicial)}</td>
             <td>${c.usuarioCierre || '—'}</td>
