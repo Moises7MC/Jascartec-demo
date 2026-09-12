@@ -492,6 +492,7 @@ function openModal(id) {
         $('#ingImei2').value = '';
         $('#ingCantidad').value = '';
         $('#ingCosto').value = '';
+        $('#ingTodasSucursales').checked = false;
         renderIngresoCart();
     }
     if (id === 'modalVenta') {
@@ -1139,6 +1140,10 @@ function toggleCampoImeiIngreso() {
     $('#ingImeiWrap').style.display = esImei ? '' : 'none';
     $('#ingImei2Wrap').style.display = esImei ? '' : 'none';
     $('#ingCantidadWrap').style.display = esImei ? 'none' : '';
+    // "Aplicar a las 3 sucursales" solo tiene sentido para stock por cantidad — un celular con
+    // IMEI es una unidad física única, no se puede "clonar" en 3 tiendas a la vez.
+    $('#ingTodasSucursalesWrap').style.display = esImei ? 'none' : '';
+    if (esImei) $('#ingTodasSucursales').checked = false;
 }
 
 function agregarItemIngreso() {
@@ -1164,9 +1169,11 @@ function agregarItemIngreso() {
     } else {
         const cantidad = parseInt($('#ingCantidad').value);
         if (!cantidad || cantidad < 1) { toast('✗ Ingrese una cantidad válida', 'error'); return; }
+        const todasSucursales = $('#ingTodasSucursales').checked;
 
-        ingresoCart.push({ key: `prod-${productoId}-${Date.now()}`, productoId, imei: null, imei2: null, cantidad, costoUnit });
+        ingresoCart.push({ key: `prod-${productoId}-${Date.now()}`, productoId, imei: null, imei2: null, cantidad, costoUnit, todasSucursales });
         $('#ingCantidad').value = '';
+        $('#ingTodasSucursales').checked = false;
     }
     $('#ingCosto').value = '';
     renderIngresoCart();
@@ -1186,13 +1193,16 @@ function renderIngresoCart() {
     $('#ingresoCartBody').innerHTML = ingresoCart.map(it => `
         <tr>
             <td>${nombreProducto(findProducto(it.productoId))}</td>
-            <td>${textoImeis(it.imei, it.imei2)}</td>
+            <td>${it.todasSucursales ? '<span class="tag tag-dark">🏬 Las 3 sucursales</span>' : textoImeis(it.imei, it.imei2)}</td>
             <td>${it.cantidad ?? 1}</td>
             <td>${formatPEN(it.costoUnit)}</td>
             <td><button class="btn-icon" onclick="quitarItemIngreso('${it.key}')"><i class='bx bx-trash'></i></button></td>
         </tr>
     `).join('');
-    const total = ingresoCart.reduce((s, it) => s + it.costoUnit * (it.cantidad ?? 1), 0);
+    // Las líneas "para las 3 sucursales" cuentan 3 veces en el total del ingreso (misma
+    // cantidad recibida en cada una) — así el número que se ve acá cuadra con lo que después
+    // van a mostrar los 3 comprobantes de ingreso que se crean al confirmar.
+    const total = ingresoCart.reduce((s, it) => s + it.costoUnit * (it.cantidad ?? 1) * (it.todasSucursales ? 3 : 1), 0);
     $('#ingresoResumen').textContent = `${ingresoCart.length} línea(s) · Total: ${formatPEN(total)}`;
 }
 
@@ -1205,15 +1215,38 @@ async function confirmarIngreso() {
     if (!sucursalId) { toast('✗ Seleccione la sucursal', 'error'); return; }
     if (!ingresoCart.length) { toast('✗ Agregue al menos un producto', 'error'); return; }
 
+    // El backend guarda UN ingreso = UNA sucursal. Las líneas normales van a la sucursal
+    // elegida arriba; las marcadas "las 3 sucursales" se replican (misma cantidad) en cada
+    // una de las activas — así que se agrupan por sucursal destino y se manda un POST por
+    // cada sucursal que termine con al menos una línea.
+    const activas = sucursales.filter(s => s.activa);
+    const porSucursal = {};
+    for (const item of ingresoCart) {
+        const { todasSucursales, key, ...itemLimpio } = item;
+        const destinos = todasSucursales ? activas.map(s => s.id) : [sucursalId];
+        for (const destino of destinos) {
+            (porSucursal[destino] ??= []).push(itemLimpio);
+        }
+    }
+
     try {
-        await api.post('/ingresos', { fecha: today(), proveedorId, numeroFactura, sucursalId, items: ingresoCart });
-        toast(`✓ Ingreso registrado: ${ingresoCart.length} línea(s)`, 'success');
+        const sucursalesAfectadas = Object.keys(porSucursal);
+        for (const destino of sucursalesAfectadas) {
+            await api.post('/ingresos', { fecha: today(), proveedorId, numeroFactura, sucursalId: parseInt(destino), items: porSucursal[destino] });
+        }
+        toast(sucursalesAfectadas.length > 1
+            ? `✓ Ingreso registrado en ${sucursalesAfectadas.length} sucursales`
+            : `✓ Ingreso registrado: ${ingresoCart.length} línea(s)`, 'success');
         closeModal('modalIngreso');
         ingresoCart = [];
         await Promise.all([cargarIngresos(), cargarProductos()]);
         refrescarUI();
     } catch (err) {
-        toast(`✗ ${err.message}`, 'error');
+        toast(`✗ ${err.message} — revisa Ingresos, puede que algunas sucursales ya hayan quedado registradas`, 'error');
+        ingresoCart = [];
+        closeModal('modalIngreso');
+        await Promise.all([cargarIngresos(), cargarProductos()]);
+        refrescarUI();
     }
 }
 
