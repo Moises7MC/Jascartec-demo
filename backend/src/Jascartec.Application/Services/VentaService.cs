@@ -112,12 +112,23 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             fechaPagoAcordada = fechasCuotas[^1];
         }
 
+        // El medio de pago es obligatorio en Contado (paga toda la venta ahora); en Crédito solo
+        // si hay un inicial mayor a 0 (ese dinero entra ahora, el resto se cobra después en cuotas).
+        MedioPago? medioPago = null;
+        if (formaPago == FormaPago.Contado || montoInicial is > 0)
+        {
+            if (string.IsNullOrWhiteSpace(request.MedioPago))
+                throw new BusinessRuleException("Indique el medio de pago (Efectivo, Yape, Tarjeta o Transferencia).");
+            medioPago = ParsearMedioPago(request.MedioPago);
+        }
+
         var venta = new Venta
         {
             NumBoleta = await unitOfWork.Ventas.GenerarSiguienteNumBoletaAsync(ct),
             Fecha = fecha,
             ClienteId = request.ClienteId,
             FormaPago = formaPago,
+            MedioPago = formaPago == FormaPago.Contado ? medioPago : null,
             FechaPagoAcordada = fechaPagoAcordada,
             CreadoEn = DateTimeOffset.UtcNow,
             MontoInicial = montoInicial,
@@ -149,7 +160,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         // El inicial cuenta como el primer abono, así entra al flujo de caja y al saldo desde el día uno.
         if (montoInicial is > 0)
         {
-            venta.Abonos.Add(new Abono { VentaId = venta.Id, Fecha = fecha, Monto = montoInicial.Value });
+            venta.Abonos.Add(new Abono { VentaId = venta.Id, Fecha = fecha, Monto = montoInicial.Value, MedioPago = medioPago!.Value });
             await unitOfWork.SaveChangesAsync(ct);
         }
 
@@ -169,7 +180,8 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         if (request.Monto > venta.SaldoPendiente)
             throw new BusinessRuleException($"El abono ({request.Monto:F2}) supera el saldo pendiente ({venta.SaldoPendiente:F2}).");
 
-        venta.Abonos.Add(new Abono { VentaId = ventaId, Fecha = request.Fecha, Monto = request.Monto });
+        var medioPago = ParsearMedioPago(request.MedioPago);
+        venta.Abonos.Add(new Abono { VentaId = ventaId, Fecha = request.Fecha, Monto = request.Monto, MedioPago = medioPago });
         await unitOfWork.SaveChangesAsync(ct);
 
         return await ObtenerAsync(ventaId, ct);
@@ -225,6 +237,15 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         "Contado" => FormaPago.Contado,
         "Crédito" or "Credito" => FormaPago.Credito,
         _ => throw new BusinessRuleException($"Forma de pago inválida: '{formaPago}'. Use 'Contado' o 'Crédito'.")
+    };
+
+    private static MedioPago ParsearMedioPago(string medioPago) => medioPago switch
+    {
+        "Efectivo" => MedioPago.Efectivo,
+        "Yape" => MedioPago.Yape,
+        "Tarjeta" => MedioPago.Tarjeta,
+        "Transferencia" => MedioPago.Transferencia,
+        _ => throw new BusinessRuleException($"Medio de pago inválido: '{medioPago}'. Use 'Efectivo', 'Yape', 'Tarjeta' o 'Transferencia'.")
     };
 
     private static FrecuenciaPago ParsearFrecuencia(string frecuencia) => frecuencia switch
@@ -319,13 +340,13 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
                 i.EquipoId, producto.Id, producto.Marca.Nombre,
                 $"{producto.Marca.Nombre} {producto.Modelo}", i.Equipo?.Imei, i.Equipo?.Imei2, i.Cantidad, i.PrecioUnit);
         }).ToList();
-        var abonos = v.Abonos.OrderBy(a => a.Fecha).Select(a => new AbonoDto(a.Id, a.Fecha, a.Monto)).ToList();
+        var abonos = v.Abonos.OrderBy(a => a.Fecha).Select(a => new AbonoDto(a.Id, a.Fecha, a.Monto, a.MedioPago.ToString())).ToList();
         var cuotas = ConstruirCronograma(v);
 
         return new VentaDto(
             v.Id, v.NumBoleta, v.Fecha, v.ClienteId,
             v.Cliente?.Nombre ?? "Cliente varios (sin registrar)", v.Cliente?.Documento, v.Cliente?.Direccion,
-            v.FormaPago == FormaPago.Credito ? "Crédito" : "Contado", v.FechaPagoAcordada,
+            v.FormaPago == FormaPago.Credito ? "Crédito" : "Contado", v.MedioPago?.ToString(), v.FechaPagoAcordada,
             items, abonos, v.Total, v.MontoPagado, v.SaldoPendiente,
             v.Estado.ToString(), v.FechaAnulacion, v.CreadoEn,
             v.MontoInicial, v.Recargo, v.FrecuenciaPago?.ToString(), v.NumCuotas, cuotas);

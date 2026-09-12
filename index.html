@@ -507,45 +507,80 @@
                             <h2>Flujo de caja</h2>
                             <p>Todo lo que entra y sale de tu negocio</p>
                         </div>
+                    </div>
+
+                    <div class="tabs">
+                        <button type="button" class="tab-btn active" data-caja-tab="caja" onclick="cambiarTabCaja('caja')">
+                            <i class='bx bx-wallet'></i> Caja del día
+                        </button>
+                        <button type="button" class="tab-btn" data-caja-tab="reporte" onclick="cambiarTabCaja('reporte')">
+                            <i class='bx bx-bar-chart-alt-2'></i> Reporte
+                        </button>
+                    </div>
+
+                    <div class="caja-tab-panel" id="cajaTabCaja">
+                        <div id="cajaEstadoContainer"></div>
+
+                        <h3 class="section-subtitle" style="margin-top:2rem;">Historial de cajas</h3>
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Abrió</th>
+                                        <th>Inicial</th>
+                                        <th>Cerró</th>
+                                        <th>Contado</th>
+                                        <th>Esperado</th>
+                                        <th>Diferencia</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cajaHistorialBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="caja-tab-panel" id="cajaTabReporte" style="display:none;">
                         <div class="date-filters">
                             <label>Desde <input type="date" id="cajaDesde"></label>
                             <label>Hasta <input type="date" id="cajaHasta"></label>
                         </div>
-                    </div>
 
-                    <div class="stats-grid stats-grid--compact">
-                        <div class="stat-card">
-                            <span class="stat-card__label">Entradas del período</span>
-                            <span class="stat-card__value stat-card__value--green" id="cajaEntradas">S/ 0.00</span>
+                        <div class="stats-grid stats-grid--compact">
+                            <div class="stat-card">
+                                <span class="stat-card__label">Entradas del período</span>
+                                <span class="stat-card__value stat-card__value--green" id="cajaEntradas">S/ 0.00</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-card__label">Salidas del período</span>
+                                <span class="stat-card__value stat-card__value--red" id="cajaSalidas">S/ 0.00</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-card__label">Saldo del período</span>
+                                <span class="stat-card__value" id="cajaSaldo">S/ 0.00</span>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Salidas del período</span>
-                            <span class="stat-card__value stat-card__value--red" id="cajaSalidas">S/ 0.00</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-card__label">Saldo del período</span>
-                            <span class="stat-card__value" id="cajaSaldo">S/ 0.00</span>
-                        </div>
-                    </div>
 
-                    <div class="card">
-                        <div class="card__header"><h3>Entradas vs. Salidas — últimos 6 meses</h3></div>
-                        <canvas id="chartFlujoCaja" height="100"></canvas>
-                    </div>
+                        <div class="card">
+                            <div class="card__header"><h3>Entradas vs. Salidas — últimos 6 meses</h3></div>
+                            <canvas id="chartFlujoCaja" height="100"></canvas>
+                        </div>
 
-                    <div class="table-wrap">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Tipo</th>
-                                    <th>Concepto</th>
-                                    <th>Monto</th>
-                                    <th>Saldo acumulado</th>
-                                </tr>
-                            </thead>
-                            <tbody id="flujoCajaBody"></tbody>
-                        </table>
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Tipo</th>
+                                        <th>Concepto</th>
+                                        <th>Monto</th>
+                                        <th>Saldo acumulado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="flujoCajaBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
@@ -937,6 +972,17 @@
                         <select id="venFormaPago" onchange="toggleCampoCredito()">
                             <option value="Contado">Contado</option>
                             <option value="Crédito">Crédito</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row" id="venMedioPagoWrap">
+                    <div class="form-group">
+                        <label>Medio de pago</label>
+                        <select id="venMedioPago">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Yape">Yape</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="Transferencia">Transferencia</option>
                         </select>
                     </div>
                 </div>
@@ -1342,6 +1388,81 @@
                 </div>
                 <div class="list-modal" id="cuotasHoyList" style="margin-top:1rem;"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- Abrir caja -->
+    <div class="modal" id="modalAbrirCaja">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Abrir caja</h3>
+                <button class="modal__close" onclick="closeModal('modalAbrirCaja')"><i class='bx bx-x'></i></button>
+            </div>
+            <form class="modal__body" id="formAbrirCaja">
+                <p class="muted">Contá el efectivo físico que hay ahora en la caja (el vuelto con el que arrancás el día) y anotalo acá.</p>
+                <div class="form-group">
+                    <label>Monto inicial (S/)</label>
+                    <input type="number" id="cajaAperturaMonto" step="0.01" min="0" placeholder="0.00" required>
+                </div>
+                <div class="form-group">
+                    <label>Observaciones (opcional)</label>
+                    <input type="text" id="cajaAperturaObs" placeholder="Ej: vuelto de billetes chicos">
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">Abrir caja</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cerrar caja -->
+    <div class="modal" id="modalCerrarCaja">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Cerrar caja</h3>
+                <button class="modal__close" onclick="closeModal('modalCerrarCaja')"><i class='bx bx-x'></i></button>
+            </div>
+            <form class="modal__body" id="formCerrarCaja">
+                <div class="detalle-grid" style="margin-bottom:1rem;">
+                    <div><div class="label">Efectivo esperado por el sistema</div><div class="value" id="cajaCierreEsperado">S/ 0.00</div></div>
+                </div>
+                <div class="form-group">
+                    <label>Efectivo real contado (S/)</label>
+                    <input type="number" id="cajaCierreMonto" step="0.01" min="0" placeholder="0.00" required oninput="actualizarDiferenciaCierreCaja()">
+                </div>
+                <div class="form-group">
+                    <label>Observaciones (opcional)</label>
+                    <input type="text" id="cajaCierreObs" placeholder="Ej: faltaron S/5, no se encontró el motivo">
+                </div>
+                <p id="cajaCierreDiferencia" class="muted"></p>
+                <button type="submit" class="btn btn--primary btn--full">Cerrar caja</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Movimiento manual de caja -->
+    <div class="modal" id="modalMovimientoCaja">
+        <div class="modal__box">
+            <div class="modal__header">
+                <h3>Registrar movimiento</h3>
+                <button class="modal__close" onclick="closeModal('modalMovimientoCaja')"><i class='bx bx-x'></i></button>
+            </div>
+            <form class="modal__body" id="formMovimientoCaja">
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="movCajaTipo">
+                        <option value="Salida">Salida (gasto en efectivo)</option>
+                        <option value="Ingreso">Ingreso (efectivo extra a la caja)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Concepto</label>
+                    <input type="text" id="movCajaConcepto" placeholder="Ej: compra de cinta de embalaje" required>
+                </div>
+                <div class="form-group">
+                    <label>Monto (S/)</label>
+                    <input type="number" id="movCajaMonto" step="0.01" min="0.01" placeholder="0.00" required>
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">Registrar</button>
+            </form>
         </div>
     </div>
 

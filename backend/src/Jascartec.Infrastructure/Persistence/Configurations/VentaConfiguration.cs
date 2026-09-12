@@ -22,6 +22,7 @@ public class VentaConfiguration : IEntityTypeConfiguration<Venta>
             .HasConversion(
                 v => v == FormaPago.Credito ? "Crédito" : "Contado",
                 v => v == "Crédito" ? FormaPago.Credito : FormaPago.Contado);
+        b.Property(x => x.MedioPago).HasColumnName("medio_pago").HasConversion<string>().HasMaxLength(15);
         b.Property(x => x.FechaPagoAcordada).HasColumnName("fecha_pago_acordada");
         b.Property(x => x.CreadoEn).HasColumnName("creado_en").IsRequired();
         b.Property(x => x.Estado).HasColumnName("estado").HasConversion<string>().HasMaxLength(10).IsRequired()

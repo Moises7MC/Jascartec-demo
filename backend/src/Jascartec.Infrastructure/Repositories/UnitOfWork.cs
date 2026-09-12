@@ -18,7 +18,9 @@ public class UnitOfWork(
     IRepository<IngresoItem> ingresoItems,
     IEquipoRepository equipos,
     IFacturaRepository facturas,
-    IVentaRepository ventas) : IUnitOfWork
+    IVentaRepository ventas,
+    ICajaSesionRepository cajaSesiones,
+    IRepository<MovimientoCajaManual> movimientosCaja) : IUnitOfWork
 {
     public INegocioRepository Negocios => negocios;
     public IUsuarioRepository Usuarios => usuarios;
@@ -32,6 +34,8 @@ public class UnitOfWork(
     public IEquipoRepository Equipos => equipos;
     public IFacturaRepository Facturas => facturas;
     public IVentaRepository Ventas => ventas;
+    public ICajaSesionRepository CajaSesiones => cajaSesiones;
+    public IRepository<MovimientoCajaManual> MovimientosCaja => movimientosCaja;
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default) => context.SaveChangesAsync(ct);
 }

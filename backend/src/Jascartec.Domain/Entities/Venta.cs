@@ -9,6 +9,9 @@ public class Venta
     public DateOnly Fecha { get; set; }
     public int? ClienteId { get; set; } // null = "cliente varios (sin registrar)"
     public FormaPago FormaPago { get; set; } = FormaPago.Contado;
+    // Solo tiene sentido en Contado (cómo se pagó la venta completa); en Crédito el medio de
+    // pago real vive en cada Abono (incluido el inicial, que se guarda como el primer abono).
+    public MedioPago? MedioPago { get; set; }
     public DateOnly? FechaPagoAcordada { get; set; }
     public DateTimeOffset CreadoEn { get; set; }
     public EstadoBoleta Estado { get; set; } = EstadoBoleta.Activa;

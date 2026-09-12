@@ -330,7 +330,7 @@ function renderView(view) {
         inventario: renderInventario,
         ingresos: renderIngresos,
         ventas: renderVentas,
-        flujocaja: renderFlujoCaja,
+        flujocaja: renderVistaFlujoCaja,
         productos: renderProductos,
         proveedores: renderProveedores,
         facturas: renderFacturas,
@@ -403,6 +403,7 @@ function openModal(id) {
         ventaEquiposDisponiblesCache = [];
         seleccionarClienteVenta(null);
         $('#venFormaPago').value = 'Contado';
+        $('#venMedioPago').value = 'Efectivo';
         $('#venMontoInicial').value = '';
         $('#venFrecuencia').value = 'Semanal';
         toggleCampoCredito();
@@ -1249,6 +1250,16 @@ function toggleCampoCredito() {
         actualizarPreviewCredito();
     }
     actualizarHistorialClienteVenta();
+    actualizarVisibilidadMedioPago();
+}
+
+// El medio de pago decide si ese dinero afecta o no la caja física (solo Efectivo lo hace).
+// Se pide siempre en Contado, y en Crédito solo si hay un inicial > 0 (ese pago entra ahora).
+function actualizarVisibilidadMedioPago() {
+    const esCredito = $('#venFormaPago').value === 'Crédito';
+    const montoInicial = parseFloat($('#venMontoInicial').value) || 0;
+    const requiereMedioPago = !esCredito || montoInicial > 0;
+    $('#venMedioPagoWrap').style.display = requiereMedioPago ? '' : 'none';
 }
 
 // Muestra el historial crediticio del cliente elegido apenas la venta es a crédito — el
@@ -1328,7 +1339,7 @@ function actualizarPreviewCredito() {
         </table>
     `;
 }
-$('#venMontoInicial').addEventListener('input', actualizarPreviewCredito);
+$('#venMontoInicial').addEventListener('input', () => { actualizarPreviewCredito(); actualizarVisibilidadMedioPago(); });
 $('#venFrecuencia').addEventListener('change', () => { actualizarNumCuotasOptions(); actualizarPreviewCredito(); });
 $('#venNumCuotas').addEventListener('change', actualizarPreviewCredito);
 
@@ -1564,6 +1575,9 @@ async function confirmarVenta() {
         payload.montoInicial = montoInicial;
         payload.frecuenciaPago = $('#venFrecuencia').value;
         payload.numCuotas = numCuotas;
+        if (montoInicial > 0) payload.medioPago = $('#venMedioPago').value;
+    } else {
+        payload.medioPago = $('#venMedioPago').value;
     }
 
     try {
@@ -1737,7 +1751,7 @@ function abrirGestionPago(ventaId) {
     const abonosHtml = (v.abonos || []).length
         ? v.abonos.map(a => `
             <div class="list-item">
-                <div><div class="list-item__name">Abono</div><div class="list-item__meta">${formatDateLong(a.fecha)}</div></div>
+                <div><div class="list-item__name">Abono · ${a.medioPago}</div><div class="list-item__meta">${formatDateLong(a.fecha)}</div></div>
                 <span class="tag tag-green">${formatPEN(a.monto)}</span>
             </div>`).join('')
         : '<div class="empty-state">Aún no ha registrado abonos</div>';
@@ -1779,6 +1793,15 @@ function abrirGestionPago(ventaId) {
             <div class="inline-form">
                 <div class="form-group"><label>Monto (S/)</label><input type="number" id="abonoMonto" step="0.01" min="0.01" max="${saldo.toFixed(2)}" value="${saldo.toFixed(2)}"></div>
                 <div class="form-group"><label>Fecha</label><input type="date" id="abonoFecha" value="${today()}"></div>
+                <div class="form-group">
+                    <label>Medio de pago</label>
+                    <select id="abonoMedioPago">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Yape">Yape</option>
+                        <option value="Tarjeta">Tarjeta</option>
+                        <option value="Transferencia">Transferencia</option>
+                    </select>
+                </div>
                 <button type="button" class="btn btn--primary" onclick="registrarAbono(${v.id})">Registrar</button>
             </div>
         ` : ''}
@@ -1789,11 +1812,12 @@ function abrirGestionPago(ventaId) {
 async function registrarAbono(ventaId) {
     const monto = parseFloat($('#abonoMonto').value);
     const fecha = $('#abonoFecha').value;
+    const medioPago = $('#abonoMedioPago').value;
     if (!monto || monto <= 0) { toast('✗ Ingrese un monto válido', 'error'); return; }
     if (!fecha) { toast('✗ Ingrese la fecha del abono', 'error'); return; }
 
     try {
-        await api.post(`/ventas/${ventaId}/abonos`, { fecha, monto });
+        await api.post(`/ventas/${ventaId}/abonos`, { fecha, monto, medioPago });
         toast(`✓ Abono de ${formatPEN(monto)} registrado`, 'success');
         await cargarVentas();
         refrescarUI();
@@ -2242,6 +2266,193 @@ function renderChartFlujoCaja() {
         },
         options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
     });
+}
+
+// ===================== CAJA (abrir/cerrar, movimientos manuales) =====================
+// Guarda el CajaSesionDto de la caja abierta ahora mismo, o null si no hay ninguna.
+let cajaActual = null;
+
+function cambiarTabCaja(tab) {
+    $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.cajaTab === tab));
+    $('#cajaTabCaja').style.display = tab === 'caja' ? '' : 'none';
+    $('#cajaTabReporte').style.display = tab === 'reporte' ? '' : 'none';
+    if (tab === 'reporte') renderFlujoCaja();
+}
+
+// Punto de entrada de la vista Flujo de Caja (reemplaza a renderFlujoCaja en el switch de vistas,
+// que ahora solo renderiza la pestaña "Reporte" cuando el usuario la abre).
+async function renderVistaFlujoCaja() {
+    await Promise.all([cargarCajaActual(), cargarHistorialCaja()]);
+}
+
+async function cargarCajaActual() {
+    try {
+        cajaActual = await api.get('/caja/abierta');
+    } catch (err) {
+        cajaActual = null;
+    }
+    renderEstadoCaja();
+}
+
+function renderEstadoCaja() {
+    const el = $('#cajaEstadoContainer');
+    if (!cajaActual) {
+        el.innerHTML = `
+            <div class="card caja-card caja-card--cerrada">
+                <div class="caja-card__icon"><i class='bx bx-lock-alt'></i></div>
+                <div class="caja-card__texto">
+                    <h3>No hay una caja abierta</h3>
+                    <p class="muted">Abrí la caja al empezar el día, contando el efectivo físico que hay ahora.</p>
+                </div>
+                <button type="button" class="btn btn--primary" onclick="abrirModalAbrirCaja()">Abrir caja</button>
+            </div>
+        `;
+        return;
+    }
+
+    const c = cajaActual;
+    const movimientosHtml = c.movimientos.length
+        ? c.movimientos.map(m => `
+            <div class="list-item">
+                <div class="list-item__top">
+                    <div><div class="list-item__name">${m.concepto}</div><div class="list-item__meta">${formatHora(m.creadoEn)} · ${m.usuario}</div></div>
+                    <span class="tag ${m.tipo === 'Ingreso' ? 'tag-green' : 'tag-red'}">${m.tipo === 'Ingreso' ? '+' : '-'}${formatPEN(m.monto)}</span>
+                </div>
+            </div>
+        `).join('')
+        : '<div class="empty-state">Sin movimientos manuales todavía</div>';
+
+    el.innerHTML = `
+        <div class="card caja-card caja-card--abierta">
+            <div class="caja-card__header">
+                <div>
+                    <h3>Caja abierta — ${formatDateLong(c.fecha)}</h3>
+                    <p class="muted">Abrió ${c.usuarioApertura} a las ${formatHora(c.abiertaEn)}${c.observacionesApertura ? ` · ${c.observacionesApertura}` : ''}</p>
+                </div>
+                <button type="button" class="btn btn--danger" onclick="abrirModalCerrarCaja()">Cerrar caja</button>
+            </div>
+            <div class="detalle-grid" style="margin:1rem 0;">
+                <div><div class="label">Monto inicial</div><div class="value">${formatPEN(c.montoInicial)}</div></div>
+                <div><div class="label">Ventas en efectivo</div><div class="value">${formatPEN(c.ventasEfectivo)}</div></div>
+                <div><div class="label">Movimientos manuales</div><div class="value">+${formatPEN(c.movimientosIngreso)} / -${formatPEN(c.movimientosSalida)}</div></div>
+                <div><div class="label">Efectivo esperado ahora</div><div class="value caja-card__esperado">${formatPEN(c.efectivoEsperado)}</div></div>
+            </div>
+            <button type="button" class="btn-small-outline" onclick="openModal('modalMovimientoCaja')"><i class='bx bx-plus'></i> Registrar movimiento</button>
+            <h4 class="section-subtitle" style="margin-top:1.25rem;">Movimientos de hoy</h4>
+            <div class="list-modal">${movimientosHtml}</div>
+        </div>
+    `;
+}
+
+function abrirModalAbrirCaja() {
+    $('#cajaAperturaMonto').value = '';
+    $('#cajaAperturaObs').value = '';
+    openModal('modalAbrirCaja');
+}
+
+$('#formAbrirCaja').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const montoInicial = parseFloat($('#cajaAperturaMonto').value);
+    if (isNaN(montoInicial) || montoInicial < 0) { toast('✗ Ingrese un monto inicial válido', 'error'); return; }
+    try {
+        cajaActual = await api.post('/caja/abrir', { montoInicial, observaciones: $('#cajaAperturaObs').value.trim() || null });
+        toast('✓ Caja abierta', 'success');
+        closeModal('modalAbrirCaja');
+        renderEstadoCaja();
+        await cargarHistorialCaja();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
+});
+
+function abrirModalCerrarCaja() {
+    if (!cajaActual) return;
+    $('#cajaCierreEsperado').textContent = formatPEN(cajaActual.efectivoEsperado);
+    $('#cajaCierreMonto').value = '';
+    $('#cajaCierreObs').value = '';
+    $('#cajaCierreDiferencia').textContent = '';
+    openModal('modalCerrarCaja');
+}
+
+function actualizarDiferenciaCierreCaja() {
+    if (!cajaActual) return;
+    const contado = parseFloat($('#cajaCierreMonto').value);
+    const el = $('#cajaCierreDiferencia');
+    if (isNaN(contado)) { el.textContent = ''; return; }
+    const diferencia = contado - cajaActual.efectivoEsperado;
+    if (Math.abs(diferencia) < 0.01) el.textContent = '✓ Cuadra exacto.';
+    else if (diferencia > 0) el.textContent = `Sobran ${formatPEN(diferencia)}.`;
+    else el.textContent = `Faltan ${formatPEN(Math.abs(diferencia))}.`;
+}
+
+$('#formCerrarCaja').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!cajaActual) return;
+    const montoContadoCierre = parseFloat($('#cajaCierreMonto').value);
+    if (isNaN(montoContadoCierre) || montoContadoCierre < 0) { toast('✗ Ingrese el efectivo contado', 'error'); return; }
+
+    const ok = await askConfirm({
+        title: '¿Cerrar la caja?',
+        message: 'Una vez cerrada no se pueden agregar más movimientos a esta jornada.',
+        confirmText: 'Sí, cerrar'
+    });
+    if (!ok) return;
+
+    try {
+        await api.post(`/caja/${cajaActual.id}/cerrar`, { montoContadoCierre, observaciones: $('#cajaCierreObs').value.trim() || null });
+        toast('✓ Caja cerrada', 'success');
+        closeModal('modalCerrarCaja');
+        cajaActual = null;
+        renderEstadoCaja();
+        await cargarHistorialCaja();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
+});
+
+$('#formMovimientoCaja').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!cajaActual) return;
+    const tipo = $('#movCajaTipo').value;
+    const concepto = $('#movCajaConcepto').value.trim();
+    const monto = parseFloat($('#movCajaMonto').value);
+    if (!concepto) { toast('✗ Ingrese el concepto', 'error'); return; }
+    if (!monto || monto <= 0) { toast('✗ Ingrese un monto válido', 'error'); return; }
+
+    try {
+        cajaActual = await api.post(`/caja/${cajaActual.id}/movimientos`, { tipo, concepto, monto });
+        toast('✓ Movimiento registrado', 'success');
+        closeModal('modalMovimientoCaja');
+        $('#formMovimientoCaja').reset();
+        renderEstadoCaja();
+    } catch (err) {
+        toast(`✗ ${err.message}`, 'error');
+    }
+});
+
+async function cargarHistorialCaja() {
+    let historial = [];
+    try {
+        historial = await api.get('/caja');
+    } catch (err) {
+        historial = [];
+    }
+    if (!historial.length) {
+        $('#cajaHistorialBody').innerHTML = '<tr><td colspan="8" class="empty-state">Todavía no se registró ninguna caja</td></tr>';
+        return;
+    }
+    $('#cajaHistorialBody').innerHTML = historial.map(c => `
+        <tr>
+            <td>${formatDateLong(c.fecha)}</td>
+            <td>${c.usuarioApertura}</td>
+            <td>${formatPEN(c.montoInicial)}</td>
+            <td>${c.usuarioCierre || '—'}</td>
+            <td>${c.montoContadoCierre != null ? formatPEN(c.montoContadoCierre) : '—'}</td>
+            <td>${formatPEN(c.efectivoEsperado)}</td>
+            <td>${c.diferencia != null ? `<span class="tag ${Math.abs(c.diferencia) < 0.01 ? 'tag-green' : 'tag-red'}">${c.diferencia >= 0 ? '+' : '-'}${formatPEN(Math.abs(c.diferencia))}</span>` : '—'}</td>
+            <td><span class="tag ${c.estado === 'Abierta' ? 'tag-amber' : 'tag-dark'}">${c.estado}</span></td>
+        </tr>
+    `).join('');
 }
 
 // ===================== PROVEEDORES =====================

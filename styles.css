@@ -631,6 +631,27 @@ img {
 .card__header { margin-bottom: 1rem; }
 .card__header h3 { font-size: 1rem; }
 
+/*=============== CAJA (abrir/cerrar) ===============*/
+.caja-card--cerrada {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+.caja-card__icon {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--container-color);
+  color: var(--text-color-light);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.caja-card__texto { flex: 1; min-width: 200px; }
+.caja-card--cerrada > button { margin-left: auto; }
+.caja-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.caja-card__esperado { font-size: 1.3rem; color: var(--first-color-alt); }
+
 /*=============== TABLE ===============*/
 .table-wrap {
   background: var(--body-color);

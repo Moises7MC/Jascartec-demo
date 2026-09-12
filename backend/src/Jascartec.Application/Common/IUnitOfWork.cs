@@ -21,6 +21,8 @@ public interface IUnitOfWork
     IEquipoRepository Equipos { get; }
     IFacturaRepository Facturas { get; }
     IVentaRepository Ventas { get; }
+    ICajaSesionRepository CajaSesiones { get; }
+    IRepository<MovimientoCajaManual> MovimientosCaja { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

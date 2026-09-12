@@ -20,6 +20,8 @@ public class JascartecDbContext(DbContextOptions<JascartecDbContext> options) : 
     public DbSet<Venta> Ventas => Set<Venta>();
     public DbSet<VentaItem> VentaItems => Set<VentaItem>();
     public DbSet<Abono> Abonos => Set<Abono>();
+    public DbSet<CajaSesion> CajaSesiones => Set<CajaSesion>();
+    public DbSet<MovimientoCajaManual> MovimientosCajaManuales => Set<MovimientoCajaManual>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
