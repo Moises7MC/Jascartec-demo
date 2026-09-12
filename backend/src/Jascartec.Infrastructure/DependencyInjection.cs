@@ -33,6 +33,8 @@ public static class DependencyInjection
         services.AddScoped<IVentaRepository, VentaRepository>();
         services.AddScoped<ICajaSesionRepository, CajaSesionRepository>();
         services.AddScoped<IRepository<Jascartec.Domain.Entities.MovimientoCajaManual>, Repository<Jascartec.Domain.Entities.MovimientoCajaManual>>();
+        services.AddScoped<IRepository<Jascartec.Domain.Entities.Sucursal>, Repository<Jascartec.Domain.Entities.Sucursal>>();
+        services.AddScoped<IRepository<Jascartec.Domain.Entities.ProductoStock>, Repository<Jascartec.Domain.Entities.ProductoStock>>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;

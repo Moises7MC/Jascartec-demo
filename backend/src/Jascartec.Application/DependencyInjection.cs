@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IFacturaService, FacturaService>();
         services.AddScoped<IVentaService, VentaService>();
         services.AddScoped<ICajaService, CajaService>();
+        services.AddScoped<ISucursalService, SucursalService>();
 
         return services;
     }

@@ -22,9 +22,11 @@ public class EquipoConfiguration : IEntityTypeConfiguration<Equipo>
         b.Property(x => x.ProveedorId).HasColumnName("proveedor_id");
         b.Property(x => x.IngresoId).HasColumnName("ingreso_id");
         b.Property(x => x.EstadoVenta).HasColumnName("estado_venta").HasConversion<string>().HasMaxLength(15).IsRequired();
+        b.Property(x => x.SucursalId).HasColumnName("sucursal_id").IsRequired();
 
         b.HasOne(x => x.Producto).WithMany(p => p.Equipos).HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Proveedor).WithMany().HasForeignKey(x => x.ProveedorId).OnDelete(DeleteBehavior.SetNull);
         b.HasOne(x => x.Ingreso).WithMany(i => i.Equipos).HasForeignKey(x => x.IngresoId).OnDelete(DeleteBehavior.SetNull);
+        b.HasOne(x => x.Sucursal).WithMany().HasForeignKey(x => x.SucursalId).OnDelete(DeleteBehavior.Restrict);
     }
 }

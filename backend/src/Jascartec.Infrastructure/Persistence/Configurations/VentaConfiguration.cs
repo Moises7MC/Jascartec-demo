@@ -16,6 +16,7 @@ public class VentaConfiguration : IEntityTypeConfiguration<Venta>
         b.HasIndex(x => x.NumBoleta).IsUnique();
         b.Property(x => x.Fecha).HasColumnName("fecha").IsRequired();
         b.Property(x => x.ClienteId).HasColumnName("cliente_id");
+        b.Property(x => x.SucursalId).HasColumnName("sucursal_id").IsRequired();
         // La BD usa "Crédito" (con tilde); el enum de C# no puede llevar tilde en el nombre,
         // así que se traduce explícitamente en ambas direcciones.
         b.Property(x => x.FormaPago).HasColumnName("forma_pago").HasMaxLength(10).IsRequired()
@@ -35,6 +36,7 @@ public class VentaConfiguration : IEntityTypeConfiguration<Venta>
         b.Property(x => x.NumCuotas).HasColumnName("num_cuotas");
 
         b.HasOne(x => x.Cliente).WithMany(c => c.Ventas).HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.SetNull);
+        b.HasOne(x => x.Sucursal).WithMany().HasForeignKey(x => x.SucursalId).OnDelete(DeleteBehavior.Restrict);
         b.Ignore(x => x.Total);
         b.Ignore(x => x.MontoPagado);
         b.Ignore(x => x.SaldoPendiente);

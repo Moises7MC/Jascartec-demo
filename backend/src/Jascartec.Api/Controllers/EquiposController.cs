@@ -11,6 +11,6 @@ namespace Jascartec.Api.Controllers;
 public class EquiposController(IEquipoService equipoService) : ControllerBase
 {
     [HttpGet("disponibles")]
-    public async Task<ActionResult<IReadOnlyList<EquipoDto>>> ListarDisponibles([FromQuery] int productoId, CancellationToken ct) =>
-        Ok(await equipoService.ListarDisponiblesAsync(productoId, ct));
+    public async Task<ActionResult<IReadOnlyList<EquipoDto>>> ListarDisponibles([FromQuery] int productoId, [FromQuery] int? sucursalId, CancellationToken ct) =>
+        Ok(await equipoService.ListarDisponiblesAsync(productoId, sucursalId, ct));
 }

@@ -11,13 +11,14 @@ public class CajaSesionRepository(JascartecDbContext context) : Repository<CajaS
     private IQueryable<CajaSesion> ConDetalles() => Set
         .Include(c => c.UsuarioApertura)
         .Include(c => c.UsuarioCierre)
+        .Include(c => c.Sucursal)
         .Include(c => c.Movimientos).ThenInclude(m => m.Usuario);
 
-    public Task<CajaSesion?> GetAbiertaAsync(CancellationToken ct = default) =>
-        ConDetalles().FirstOrDefaultAsync(c => c.Estado == EstadoCajaSesion.Abierta, ct);
+    public Task<CajaSesion?> GetAbiertaAsync(int sucursalId, CancellationToken ct = default) =>
+        ConDetalles().FirstOrDefaultAsync(c => c.Estado == EstadoCajaSesion.Abierta && c.SucursalId == sucursalId, ct);
 
-    public Task<CajaSesion?> GetByFechaAsync(DateOnly fecha, CancellationToken ct = default) =>
-        Set.FirstOrDefaultAsync(c => c.Fecha == fecha, ct);
+    public Task<CajaSesion?> GetByFechaAsync(DateOnly fecha, int sucursalId, CancellationToken ct = default) =>
+        Set.FirstOrDefaultAsync(c => c.Fecha == fecha && c.SucursalId == sucursalId, ct);
 
     public Task<CajaSesion?> GetByIdWithDetailsAsync(int id, CancellationToken ct = default) =>
         ConDetalles().FirstOrDefaultAsync(c => c.Id == id, ct);

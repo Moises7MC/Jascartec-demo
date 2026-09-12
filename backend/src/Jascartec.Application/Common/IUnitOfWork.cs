@@ -23,6 +23,8 @@ public interface IUnitOfWork
     IVentaRepository Ventas { get; }
     ICajaSesionRepository CajaSesiones { get; }
     IRepository<MovimientoCajaManual> MovimientosCaja { get; }
+    IRepository<Sucursal> Sucursales { get; }
+    IRepository<ProductoStock> ProductoStocks { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

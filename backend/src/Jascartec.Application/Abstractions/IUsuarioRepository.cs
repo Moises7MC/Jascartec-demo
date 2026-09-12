@@ -6,4 +6,5 @@ namespace Jascartec.Application.Abstractions;
 public interface IUsuarioRepository : IRepository<Usuario>
 {
     Task<Usuario?> GetByNombreUsuarioAsync(string nombreUsuario, CancellationToken ct = default);
+    Task<IReadOnlyList<Usuario>> GetAllWithDetailsAsync(CancellationToken ct = default);
 }

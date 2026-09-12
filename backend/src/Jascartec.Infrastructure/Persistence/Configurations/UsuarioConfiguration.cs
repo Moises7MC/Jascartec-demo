@@ -20,5 +20,8 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
         b.Property(x => x.Iniciales).HasColumnName("iniciales").HasMaxLength(4).IsRequired();
         b.Property(x => x.Activo).HasColumnName("activo").IsRequired();
         b.Property(x => x.CreadoEn).HasColumnName("creado_en").IsRequired();
+        b.Property(x => x.SucursalId).HasColumnName("sucursal_id");
+
+        b.HasOne(x => x.Sucursal).WithMany().HasForeignKey(x => x.SucursalId).OnDelete(DeleteBehavior.SetNull);
     }
 }

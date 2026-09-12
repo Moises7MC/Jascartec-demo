@@ -12,7 +12,7 @@ public record CuotaCronogramaDto(int Numero, decimal Monto, DateOnly FechaVencim
 
 public record VentaDto(
     int Id, string NumBoleta, DateOnly Fecha, int? ClienteId, string Cliente, string? ClienteDocumento,
-    string? ClienteDireccion, string FormaPago, string? MedioPago, DateOnly? FechaPagoAcordada,
+    string? ClienteDireccion, int SucursalId, string Sucursal, string FormaPago, string? MedioPago, DateOnly? FechaPagoAcordada,
     IReadOnlyList<VentaItemDto> Items, IReadOnlyList<AbonoDto> Abonos,
     decimal Total, decimal MontoPagado, decimal SaldoPendiente,
     string Estado, DateOnly? FechaAnulacion, DateTimeOffset CreadoEn,
@@ -28,7 +28,7 @@ public record CrearVentaItemRequest(int? EquipoId, int? ProductoId, int? Cantida
 /// el servicio calcula Recargo y FechaPagoAcordada, no se envían desde el cliente. MedioPago es obligatorio
 /// si FormaPago="Contado", o si es "Crédito" con un MontoInicial mayor a 0 (describe cómo entró ese pago).</summary>
 public record CrearVentaRequest(
-    int? ClienteId, IReadOnlyList<CrearVentaItemRequest> Items, string FormaPago, string? MedioPago = null,
+    int? ClienteId, int SucursalId, IReadOnlyList<CrearVentaItemRequest> Items, string FormaPago, string? MedioPago = null,
     decimal? MontoInicial = null, string? FrecuenciaPago = null, int? NumCuotas = null);
 
 public record RegistrarAbonoRequest(DateOnly Fecha, decimal Monto, string MedioPago);

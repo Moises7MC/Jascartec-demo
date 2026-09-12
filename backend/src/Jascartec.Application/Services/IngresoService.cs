@@ -26,6 +26,8 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
 
         if (await unitOfWork.Proveedores.GetByIdAsync(request.ProveedorId, ct) is null)
             throw new BusinessRuleException($"El proveedor con id '{request.ProveedorId}' no existe.");
+        if (await unitOfWork.Sucursales.GetByIdAsync(request.SucursalId, ct) is null)
+            throw new BusinessRuleException($"La sucursal con id '{request.SucursalId}' no existe.");
 
         // Un IMEI duplicado dentro del mismo request, o ya existente en la BD, se rechaza —
         // sin importar si aparece como el principal o como el segundo (dual SIM) de otra línea.
@@ -50,6 +52,7 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
             Fecha = request.Fecha,
             ProveedorId = request.ProveedorId,
             NumeroFactura = request.NumeroFactura,
+            SucursalId = request.SucursalId,
             CreadoEn = DateTimeOffset.UtcNow
         };
         await unitOfWork.Ingresos.AddAsync(ingreso, ct);
@@ -73,7 +76,8 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
                     CostoCompra = item.CostoUnit,
                     FechaIngreso = request.Fecha,
                     ProveedorId = request.ProveedorId,
-                    IngresoId = ingreso.Id
+                    IngresoId = ingreso.Id,
+                    SucursalId = request.SucursalId
                 }, ct);
             }
             else
@@ -89,8 +93,7 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
                     CostoUnit = item.CostoUnit
                 }, ct);
 
-                producto.StockCantidad += item.Cantidad.Value;
-                unitOfWork.Productos.Update(producto);
+                await SumarStockAsync(item.ProductoId, request.SucursalId, item.Cantidad.Value, ct);
             }
         }
         await unitOfWork.SaveChangesAsync(ct);
@@ -111,17 +114,34 @@ public class IngresoService(IUnitOfWork unitOfWork) : IIngresoService
             unitOfWork.Equipos.Remove(equipo);
         foreach (var item in ingreso.Items.ToList())
         {
-            item.Producto.StockCantidad = Math.Max(0, item.Producto.StockCantidad - item.Cantidad);
-            unitOfWork.Productos.Update(item.Producto);
+            await SumarStockAsync(item.ProductoId, ingreso.SucursalId, -item.Cantidad, ct);
             unitOfWork.IngresoItems.Remove(item);
         }
         unitOfWork.Ingresos.Remove(ingreso);
         await unitOfWork.SaveChangesAsync(ct);
     }
 
+    // Suma (o resta, con delta negativo) al contador de stock de un producto por cantidad en una
+    // sucursal puntual — crea la fila de ProductoStock si todavía no existía. Nunca deja quedar
+    // un número negativo (por si se elimina un ingreso viejo y el stock ya se movió de más).
+    private async Task SumarStockAsync(int productoId, int sucursalId, int delta, CancellationToken ct)
+    {
+        var stocks = await unitOfWork.ProductoStocks.GetAllAsync(ct);
+        var fila = stocks.FirstOrDefault(s => s.ProductoId == productoId && s.SucursalId == sucursalId);
+        if (fila is null)
+        {
+            await unitOfWork.ProductoStocks.AddAsync(new ProductoStock { ProductoId = productoId, SucursalId = sucursalId, Cantidad = Math.Max(0, delta) }, ct);
+        }
+        else
+        {
+            fila.Cantidad = Math.Max(0, fila.Cantidad + delta);
+            unitOfWork.ProductoStocks.Update(fila);
+        }
+    }
+
     private static IngresoDto ToDto(Ingreso i) => new(
-        i.Id, i.Fecha, i.ProveedorId, i.Proveedor.Nombre, i.NumeroFactura,
-        i.Equipos.Select(e => new EquipoDto(e.Id, e.ProductoId, $"{e.Producto.Marca.Nombre} {e.Producto.Modelo}", e.Imei, e.Imei2, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString())).ToList(),
+        i.Id, i.Fecha, i.ProveedorId, i.Proveedor.Nombre, i.NumeroFactura, i.SucursalId, i.Sucursal.Nombre,
+        i.Equipos.Select(e => new EquipoDto(e.Id, e.ProductoId, $"{e.Producto.Marca.Nombre} {e.Producto.Modelo}", e.Imei, e.Imei2, e.EstadoFisico, e.CostoCompra, e.FechaIngreso, e.EstadoVenta.ToString(), i.SucursalId, i.Sucursal.Nombre)).ToList(),
         i.Items.Select(it => new IngresoItemDto(it.Id, it.ProductoId, $"{it.Producto.Marca.Nombre} {it.Producto.Modelo}", it.Cantidad, it.CostoUnit)).ToList(),
         i.CreadoEn);
 }

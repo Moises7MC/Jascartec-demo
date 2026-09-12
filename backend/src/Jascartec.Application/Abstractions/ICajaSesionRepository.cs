@@ -5,8 +5,8 @@ namespace Jascartec.Application.Abstractions;
 
 public interface ICajaSesionRepository : IRepository<CajaSesion>
 {
-    Task<CajaSesion?> GetAbiertaAsync(CancellationToken ct = default);
-    Task<CajaSesion?> GetByFechaAsync(DateOnly fecha, CancellationToken ct = default);
+    Task<CajaSesion?> GetAbiertaAsync(int sucursalId, CancellationToken ct = default);
+    Task<CajaSesion?> GetByFechaAsync(DateOnly fecha, int sucursalId, CancellationToken ct = default);
     Task<CajaSesion?> GetByIdWithDetailsAsync(int id, CancellationToken ct = default);
     Task<IReadOnlyList<CajaSesion>> GetAllWithDetailsAsync(CancellationToken ct = default);
 }

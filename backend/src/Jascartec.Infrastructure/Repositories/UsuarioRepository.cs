@@ -8,5 +8,8 @@ namespace Jascartec.Infrastructure.Repositories;
 public class UsuarioRepository(JascartecDbContext context) : Repository<Usuario>(context), IUsuarioRepository
 {
     public Task<Usuario?> GetByNombreUsuarioAsync(string nombreUsuario, CancellationToken ct = default) =>
-        Set.FirstOrDefaultAsync(u => u.NombreUsuario == nombreUsuario, ct);
+        Set.Include(u => u.Sucursal).FirstOrDefaultAsync(u => u.NombreUsuario == nombreUsuario, ct);
+
+    public async Task<IReadOnlyList<Usuario>> GetAllWithDetailsAsync(CancellationToken ct = default) =>
+        await Set.Include(u => u.Sucursal).ToListAsync(ct);
 }

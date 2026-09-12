@@ -14,12 +14,12 @@ public class CajaController(ICajaService cajaService) : ControllerBase
     private int UsuarioActualId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet("abierta")]
-    public async Task<ActionResult<CajaSesionDto?>> ObtenerAbierta(CancellationToken ct) =>
-        Ok(await cajaService.ObtenerAbiertaAsync(ct));
+    public async Task<ActionResult<CajaSesionDto?>> ObtenerAbierta([FromQuery] int sucursalId, CancellationToken ct) =>
+        Ok(await cajaService.ObtenerAbiertaAsync(sucursalId, ct));
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<CajaSesionDto>>> Listar([FromQuery] DateOnly? desde, [FromQuery] DateOnly? hasta, CancellationToken ct) =>
-        Ok(await cajaService.ListarAsync(desde, hasta, ct));
+    public async Task<ActionResult<IReadOnlyList<CajaSesionDto>>> Listar([FromQuery] DateOnly? desde, [FromQuery] DateOnly? hasta, [FromQuery] int? sucursalId, CancellationToken ct) =>
+        Ok(await cajaService.ListarAsync(desde, hasta, sucursalId, ct));
 
     [HttpPost("abrir")]
     public async Task<ActionResult<CajaSesionDto>> Abrir(AbrirCajaRequest request, CancellationToken ct) =>

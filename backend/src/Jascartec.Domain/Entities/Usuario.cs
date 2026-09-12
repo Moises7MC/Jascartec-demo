@@ -12,4 +12,8 @@ public class Usuario
     public string Iniciales { get; set; } = string.Empty;
     public bool Activo { get; set; } = true;
     public DateTimeOffset CreadoEn { get; set; }
+    // Null = ve todas las sucursales (típicamente el Administrador). Un Vendedor normalmente
+    // tiene una sucursal asignada y solo vende/opera desde ahí.
+    public int? SucursalId { get; set; }
+    public Sucursal? Sucursal { get; set; }
 }

@@ -18,7 +18,6 @@ public class ProductoConfiguration : IEntityTypeConfiguration<Producto>
         b.Property(x => x.Ram).HasColumnName("ram").HasMaxLength(20);
         b.Property(x => x.Color).HasColumnName("color");
         b.Property(x => x.Descripcion).HasColumnName("descripcion");
-        b.Property(x => x.StockCantidad).HasColumnName("stock_cantidad").IsRequired().HasDefaultValue(0);
         b.Property(x => x.Precio).HasColumnName("precio").HasColumnType("numeric(10,2)").IsRequired();
         b.Property(x => x.CostoReferencial).HasColumnName("costo_referencial").HasColumnType("numeric(10,2)");
         b.Property(x => x.ProveedorId).HasColumnName("proveedor_id");

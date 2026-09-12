@@ -13,11 +13,25 @@ public class EquipoRepository(JascartecDbContext context) : Repository<Equipo>(c
     public Task<bool> ExisteImeiAsync(string imei, CancellationToken ct = default) =>
         Set.AnyAsync(e => e.Imei == imei || e.Imei2 == imei, ct);
 
-    public async Task<IReadOnlyList<Equipo>> GetDisponiblesPorProductoAsync(int productoId, CancellationToken ct = default) =>
-        await Set.Where(e => e.ProductoId == productoId && e.EstadoVenta == EstadoVenta.Disponible).ToListAsync(ct);
+    public async Task<IReadOnlyList<Equipo>> GetDisponiblesPorProductoAsync(int productoId, int? sucursalId = null, CancellationToken ct = default)
+    {
+        var query = Set.Include(e => e.Sucursal).Where(e => e.ProductoId == productoId && e.EstadoVenta == EstadoVenta.Disponible);
+        if (sucursalId.HasValue) query = query.Where(e => e.SucursalId == sucursalId.Value);
+        return await query.ToListAsync(ct);
+    }
 
     public Task<int> ContarDisponiblesPorProductoAsync(int productoId, CancellationToken ct = default) =>
         Set.CountAsync(e => e.ProductoId == productoId && e.EstadoVenta == EstadoVenta.Disponible, ct);
+
+    public async Task<IReadOnlyDictionary<int, int>> ContarDisponiblesPorProductoAgrupadoPorSucursalAsync(int productoId, CancellationToken ct = default)
+    {
+        var grupos = await Set
+            .Where(e => e.ProductoId == productoId && e.EstadoVenta == EstadoVenta.Disponible)
+            .GroupBy(e => e.SucursalId)
+            .Select(g => new { SucursalId = g.Key, Cantidad = g.Count() })
+            .ToListAsync(ct);
+        return grupos.ToDictionary(g => g.SucursalId, g => g.Cantidad);
+    }
 
     public Task<bool> ExisteAlgunoPorProductoAsync(int productoId, CancellationToken ct = default) =>
         Set.AnyAsync(e => e.ProductoId == productoId, ct);

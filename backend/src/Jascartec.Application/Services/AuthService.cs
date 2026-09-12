@@ -13,7 +13,7 @@ public class AuthService(IUnitOfWork unitOfWork, IJwtTokenGenerator jwtTokenGene
             throw new InvalidCredentialsException();
 
         var (token, expiraEn) = jwtTokenGenerator.Generar(usuario);
-        var usuarioDto = new UsuarioDto(usuario.Id, usuario.NombreUsuario, usuario.Nombre, usuario.Rol.ToString(), usuario.Iniciales, usuario.Activo);
+        var usuarioDto = new UsuarioDto(usuario.Id, usuario.NombreUsuario, usuario.Nombre, usuario.Rol.ToString(), usuario.Iniciales, usuario.Activo, usuario.SucursalId, usuario.Sucursal?.Nombre);
         return new LoginResponse(token, expiraEn, usuarioDto);
     }
 }

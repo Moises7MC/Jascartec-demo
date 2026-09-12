@@ -32,6 +32,10 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
 
         if (request.ClienteId is not null && await unitOfWork.Clientes.GetByIdAsync(request.ClienteId.Value, ct) is null)
             throw new BusinessRuleException($"El cliente con id '{request.ClienteId}' no existe.");
+        if (await unitOfWork.Sucursales.GetByIdAsync(request.SucursalId, ct) is null)
+            throw new BusinessRuleException($"La sucursal con id '{request.SucursalId}' no existe.");
+
+        var stocksActuales = await unitOfWork.ProductoStocks.GetAllAsync(ct);
 
         // Resolvemos equipos/productos primero: necesitamos el Total de la venta antes de poder
         // calcular el recargo y el cronograma de cuotas. Cada línea es o un equipo puntual con IMEI
@@ -50,6 +54,8 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
                     ?? throw new BusinessRuleException($"El equipo con id '{item.EquipoId}' no existe.");
                 if (equipo.EstadoVenta != EstadoVenta.Disponible)
                     throw new BusinessRuleException($"El equipo con IMEI '{equipo.Imei}' ya no está disponible.");
+                if (equipo.SucursalId != request.SucursalId)
+                    throw new BusinessRuleException($"El equipo con IMEI '{equipo.Imei}' está en otra sucursal, no se puede vender desde acá.");
 
                 var producto = await unitOfWork.Productos.GetByIdAsync(equipo.ProductoId, ct)
                     ?? throw new BusinessRuleException($"El producto del equipo '{equipo.Imei}' no existe.");
@@ -66,10 +72,11 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
                 if (producto.Categoria.RequiereImei)
                     throw new BusinessRuleException($"El producto '{producto.Modelo}' se controla por IMEI: elija un equipo puntual, no una cantidad.");
 
+                var disponibleEnSucursal = stocksActuales.FirstOrDefault(s => s.ProductoId == producto.Id && s.SucursalId == request.SucursalId)?.Cantidad ?? 0;
                 cantidadReservadaPorProducto.TryGetValue(producto.Id, out var yaReservado);
                 var reservadoTotal = yaReservado + item.Cantidad.Value;
-                if (reservadoTotal > producto.StockCantidad)
-                    throw new BusinessRuleException($"Stock insuficiente de '{producto.Modelo}': disponible {producto.StockCantidad}, solicitado {reservadoTotal}.");
+                if (reservadoTotal > disponibleEnSucursal)
+                    throw new BusinessRuleException($"Stock insuficiente de '{producto.Modelo}' en esta sucursal: disponible {disponibleEnSucursal}, solicitado {reservadoTotal}.");
                 cantidadReservadaPorProducto[producto.Id] = reservadoTotal;
 
                 itemsResueltos.Add((null, producto, item.Cantidad.Value));
@@ -127,6 +134,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             NumBoleta = await unitOfWork.Ventas.GenerarSiguienteNumBoletaAsync(ct),
             Fecha = fecha,
             ClienteId = request.ClienteId,
+            SucursalId = request.SucursalId,
             FormaPago = formaPago,
             MedioPago = formaPago == FormaPago.Contado ? medioPago : null,
             FechaPagoAcordada = fechaPagoAcordada,
@@ -149,8 +157,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             }
             else
             {
-                producto.StockCantidad -= cantidad;
-                unitOfWork.Productos.Update(producto);
+                await SumarStockAsync(producto.Id, request.SucursalId, -cantidad, ct);
                 venta.Items.Add(new VentaItem { VentaId = venta.Id, ProductoId = producto.Id, Cantidad = cantidad, PrecioUnit = producto.Precio });
             }
 
@@ -212,12 +219,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             }
             else if (item.ProductoId is not null)
             {
-                var producto = await unitOfWork.Productos.GetByIdAsync(item.ProductoId.Value, ct);
-                if (producto is not null)
-                {
-                    producto.StockCantidad += item.Cantidad;
-                    unitOfWork.Productos.Update(producto);
-                }
+                await SumarStockAsync(item.ProductoId.Value, venta.SucursalId, item.Cantidad, ct);
             }
 
             // Libera el equipo_id (índice único filtrado por activo=true) para que pueda
@@ -230,6 +232,23 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         await unitOfWork.SaveChangesAsync(ct);
 
         return await ObtenerAsync(id, ct);
+    }
+
+    // Igual que en IngresoService: suma (o resta) al contador de stock de un producto por
+    // cantidad en una sucursal puntual, creando la fila si todavía no existía.
+    private async Task SumarStockAsync(int productoId, int sucursalId, int delta, CancellationToken ct)
+    {
+        var stocks = await unitOfWork.ProductoStocks.GetAllAsync(ct);
+        var fila = stocks.FirstOrDefault(s => s.ProductoId == productoId && s.SucursalId == sucursalId);
+        if (fila is null)
+        {
+            await unitOfWork.ProductoStocks.AddAsync(new ProductoStock { ProductoId = productoId, SucursalId = sucursalId, Cantidad = Math.Max(0, delta) }, ct);
+        }
+        else
+        {
+            fila.Cantidad = Math.Max(0, fila.Cantidad + delta);
+            unitOfWork.ProductoStocks.Update(fila);
+        }
     }
 
     private static FormaPago ParsearFormaPago(string formaPago) => formaPago switch
@@ -346,6 +365,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         return new VentaDto(
             v.Id, v.NumBoleta, v.Fecha, v.ClienteId,
             v.Cliente?.Nombre ?? "Cliente varios (sin registrar)", v.Cliente?.Documento, v.Cliente?.Direccion,
+            v.SucursalId, v.Sucursal.Nombre,
             v.FormaPago == FormaPago.Credito ? "Crédito" : "Contado", v.MedioPago?.ToString(), v.FechaPagoAcordada,
             items, abonos, v.Total, v.MontoPagado, v.SaldoPendiente,
             v.Estado.ToString(), v.FechaAnulacion, v.CreadoEn,

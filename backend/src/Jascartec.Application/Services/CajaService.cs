@@ -7,16 +7,18 @@ namespace Jascartec.Application.Services;
 
 public class CajaService(IUnitOfWork unitOfWork) : ICajaService
 {
-    public async Task<CajaSesionDto?> ObtenerAbiertaAsync(CancellationToken ct = default)
+    public async Task<CajaSesionDto?> ObtenerAbiertaAsync(int sucursalId, CancellationToken ct = default)
     {
-        var sesion = await unitOfWork.CajaSesiones.GetAbiertaAsync(ct);
+        var sesion = await unitOfWork.CajaSesiones.GetAbiertaAsync(sucursalId, ct);
         return sesion is null ? null : await ToDtoAsync(sesion, ct);
     }
 
-    public async Task<IReadOnlyList<CajaSesionDto>> ListarAsync(DateOnly? desde, DateOnly? hasta, CancellationToken ct = default)
+    public async Task<IReadOnlyList<CajaSesionDto>> ListarAsync(DateOnly? desde, DateOnly? hasta, int? sucursalId, CancellationToken ct = default)
     {
         var sesiones = await unitOfWork.CajaSesiones.GetAllWithDetailsAsync(ct);
-        var filtradas = sesiones.Where(s => (!desde.HasValue || s.Fecha >= desde) && (!hasta.HasValue || s.Fecha <= hasta));
+        var filtradas = sesiones.Where(s =>
+            (!desde.HasValue || s.Fecha >= desde) && (!hasta.HasValue || s.Fecha <= hasta) &&
+            (!sucursalId.HasValue || s.SucursalId == sucursalId.Value));
         var dtos = new List<CajaSesionDto>();
         foreach (var s in filtradas) dtos.Add(await ToDtoAsync(s, ct));
         return dtos;
@@ -27,17 +29,21 @@ public class CajaService(IUnitOfWork unitOfWork) : ICajaService
         if (request.MontoInicial < 0)
             throw new BusinessRuleException("El monto inicial no puede ser negativo.");
 
-        if (await unitOfWork.CajaSesiones.GetAbiertaAsync(ct) is not null)
-            throw new BusinessRuleException("Ya hay una caja abierta. Ciérrala antes de abrir una nueva.");
+        if (await unitOfWork.Sucursales.GetByIdAsync(request.SucursalId, ct) is null)
+            throw new BusinessRuleException($"La sucursal con id '{request.SucursalId}' no existe.");
+
+        if (await unitOfWork.CajaSesiones.GetAbiertaAsync(request.SucursalId, ct) is not null)
+            throw new BusinessRuleException("Ya hay una caja abierta en esta sucursal. Ciérrala antes de abrir una nueva.");
 
         var hoy = RelojNegocio.HoyPeru();
-        if (await unitOfWork.CajaSesiones.GetByFechaAsync(hoy, ct) is not null)
-            throw new BusinessRuleException("La caja de hoy ya se abrió (y se cerró) antes. Solo se permite una caja por día.");
+        if (await unitOfWork.CajaSesiones.GetByFechaAsync(hoy, request.SucursalId, ct) is not null)
+            throw new BusinessRuleException("La caja de hoy ya se abrió (y se cerró) antes en esta sucursal. Solo se permite una caja por día por sucursal.");
 
         var sesion = new CajaSesion
         {
             Fecha = hoy,
             Estado = EstadoCajaSesion.Abierta,
+            SucursalId = request.SucursalId,
             UsuarioAperturaId = usuarioId,
             AbiertaEn = DateTimeOffset.UtcNow,
             MontoInicial = request.MontoInicial,
@@ -106,11 +112,11 @@ public class CajaService(IUnitOfWork unitOfWork) : ICajaService
     // Solo el efectivo mueve la caja física: ventas al contado en efectivo, y abonos (o el
     // inicial de un crédito, que se guarda como el primer abono) pagados en efectivo, ambos
     // fechados el mismo día que la sesión. Yape/Tarjeta/Transferencia no tocan el cajón.
-    private async Task<decimal> CalcularVentasEfectivoAsync(DateOnly fecha, CancellationToken ct)
+    private async Task<decimal> CalcularVentasEfectivoAsync(DateOnly fecha, int sucursalId, CancellationToken ct)
     {
         var ventas = await unitOfWork.Ventas.GetAllWithDetailsAsync(ct);
         decimal total = 0m;
-        foreach (var v in ventas.Where(v => v.Estado == Domain.Enums.EstadoBoleta.Activa))
+        foreach (var v in ventas.Where(v => v.Estado == Domain.Enums.EstadoBoleta.Activa && v.SucursalId == sucursalId))
         {
             if (v.FormaPago == Domain.Enums.FormaPago.Contado && v.Fecha == fecha && v.MedioPago == MedioPago.Efectivo)
                 total += v.Total;
@@ -122,7 +128,7 @@ public class CajaService(IUnitOfWork unitOfWork) : ICajaService
 
     private async Task<CajaSesionDto> ToDtoAsync(CajaSesion s, CancellationToken ct)
     {
-        var ventasEfectivo = await CalcularVentasEfectivoAsync(s.Fecha, ct);
+        var ventasEfectivo = await CalcularVentasEfectivoAsync(s.Fecha, s.SucursalId, ct);
         var ingresos = s.Movimientos.Where(m => m.Tipo == TipoMovimientoCaja.Ingreso).Sum(m => m.Monto);
         var salidas = s.Movimientos.Where(m => m.Tipo == TipoMovimientoCaja.Salida).Sum(m => m.Monto);
         var efectivoEsperado = s.MontoInicial + ventasEfectivo + ingresos - salidas;
@@ -135,7 +141,7 @@ public class CajaService(IUnitOfWork unitOfWork) : ICajaService
             .ToList();
 
         return new CajaSesionDto(
-            s.Id, s.Fecha, s.Estado.ToString(),
+            s.Id, s.Fecha, s.Estado.ToString(), s.SucursalId, s.Sucursal.Nombre,
             s.UsuarioApertura.Nombre, s.AbiertaEn, s.MontoInicial, s.ObservacionesApertura,
             s.UsuarioCierre?.Nombre, s.CerradaEn, s.MontoContadoCierre, s.ObservacionesCierre,
             ventasEfectivo, ingresos, salidas, efectivoEsperado, diferencia, movimientos);

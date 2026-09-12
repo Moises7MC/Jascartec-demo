@@ -21,12 +21,11 @@ public class Producto
     public string? ImagenUrl { get; set; }
     public DateTimeOffset CreadoEn { get; set; }
 
-    // Solo tiene sentido cuando Categoria.RequiereImei = false: el stock disponible se lleva acá
-    // directamente en vez de contar Equipos individuales.
-    public int StockCantidad { get; set; }
-
     public Categoria Categoria { get; set; } = null!;
     public Marca Marca { get; set; } = null!;
     public Proveedor? Proveedor { get; set; }
     public ICollection<Equipo> Equipos { get; set; } = new List<Equipo>();
+    // Solo tiene sentido cuando Categoria.RequiereImei = false: el stock por sucursal se lleva
+    // acá (una fila por sucursal) en vez de contar Equipos individuales.
+    public ICollection<ProductoStock> Stocks { get; set; } = new List<ProductoStock>();
 }

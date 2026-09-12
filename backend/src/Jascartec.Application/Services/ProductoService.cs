@@ -83,8 +83,9 @@ public class ProductoService(IUnitOfWork unitOfWork) : IProductoService
         var producto = await unitOfWork.Productos.GetByIdAsync(id, ct) ?? throw new NotFoundException("Producto", id);
         if (await unitOfWork.Equipos.ExisteAlgunoPorProductoAsync(id, ct))
             throw new BusinessRuleException("No se puede eliminar: el producto tiene equipos (IMEIs) registrados.");
-        if (producto.StockCantidad > 0)
-            throw new BusinessRuleException("No se puede eliminar: el producto todavía tiene stock registrado.");
+        var stocks = await unitOfWork.ProductoStocks.GetAllAsync(ct);
+        if (stocks.Any(s => s.ProductoId == id && s.Cantidad > 0))
+            throw new BusinessRuleException("No se puede eliminar: el producto todavía tiene stock registrado en alguna sucursal.");
 
         unitOfWork.Productos.Remove(producto);
         await unitOfWork.SaveChangesAsync(ct);
@@ -99,15 +100,29 @@ public class ProductoService(IUnitOfWork unitOfWork) : IProductoService
 
     private async Task<ProductoDto> ToDtoAsync(Producto p, CancellationToken ct)
     {
-        // El stock disponible se lleva distinto según el tipo de categoría: IMEI cuenta equipos
-        // individuales; cantidad simple lee el contador directo del producto.
-        var stock = p.Categoria.RequiereImei
-            ? await unitOfWork.Equipos.ContarDisponiblesPorProductoAsync(p.Id, ct)
-            : p.StockCantidad;
+        // El stock se lleva distinto según el tipo de categoría: IMEI cuenta equipos individuales
+        // agrupados por sucursal; cantidad simple lee las filas de ProductoStock (una por sucursal).
+        List<StockSucursalDto> porSucursal;
+        int total;
+        if (p.Categoria.RequiereImei)
+        {
+            var agrupado = await unitOfWork.Equipos.ContarDisponiblesPorProductoAgrupadoPorSucursalAsync(p.Id, ct);
+            var sucursales = await unitOfWork.Sucursales.GetAllAsync(ct);
+            porSucursal = sucursales
+                .Select(s => new StockSucursalDto(s.Id, s.Nombre, agrupado.GetValueOrDefault(s.Id)))
+                .ToList();
+            total = agrupado.Values.Sum();
+        }
+        else
+        {
+            porSucursal = p.Stocks.Select(s => new StockSucursalDto(s.SucursalId, s.Sucursal.Nombre, s.Cantidad)).ToList();
+            total = p.Stocks.Sum(s => s.Cantidad);
+        }
+
         return new ProductoDto(
             p.Id, p.CategoriaId, p.Categoria.Nombre, p.Categoria.RequiereImei, p.MarcaId, p.Marca.Nombre, p.Modelo,
             p.Almacenamiento, p.Ram, p.Color, p.Descripcion,
             p.Precio, p.CostoReferencial, p.ProveedorId, p.Proveedor?.Nombre, p.Codigo,
-            p.Gama?.ToString(), p.ImagenUrl, stock, p.CreadoEn);
+            p.Gama?.ToString(), p.ImagenUrl, total, porSucursal, p.CreadoEn);
     }
 }
