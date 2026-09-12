@@ -238,10 +238,20 @@ $('#formLogin').addEventListener('submit', async (e) => {
         setAuthToken(token);
         currentUser = usuarioLogueado;
         errEl.classList.remove('show');
-        await enterApp();
     } catch (err) {
         errEl.textContent = `✗ ${err.message}`;
         errEl.classList.add('show');
+        return;
+    }
+
+    // A partir de acá el login YA fue exitoso (usuario/contraseña correctos) — cualquier error
+    // de este punto en adelante es un problema al cargar la pantalla, no una credencial mala,
+    // así que no debe mostrarse en el cuadro rojo de "usuario o contraseña incorrectos".
+    try {
+        await enterApp();
+    } catch (err) {
+        console.error(err);
+        toast(`✗ Ocurrió un problema al cargar el sistema: ${err.message}`, 'error');
     }
 });
 
@@ -605,6 +615,12 @@ function initCharts() {
     const ctx3 = $('#chartTopProductos');
     const ctx4 = $('#chartFlujoCaja');
     if (!ctx1 || typeof Chart === 'undefined') return;
+
+    // Si ya había gráficos de una sesión anterior (cerrar sesión y volver a entrar sin recargar
+    // la página), hay que destruirlos antes de crear otros nuevos sobre el mismo <canvas> —
+    // Chart.js no permite dos instancias encima del mismo elemento y tira error.
+    [chartVentas, chartMarcas, chartTopProductos, chartFlujoCajaChart].forEach(c => c?.destroy());
+    chartVentas = chartMarcas = chartTopProductos = chartFlujoCajaChart = null;
 
     const dias = [];
     for (let i = 13; i >= 0; i--) {
