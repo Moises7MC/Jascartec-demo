@@ -705,16 +705,22 @@ function renderInventario() {
         return pasaBusqueda && pasaMarca && pasaCategoria;
     });
 
+    // "Disponibles" muestra el stock de la sucursal elegida arriba (no el total del negocio) —
+    // el desglose de las 3 sucursales igual se ve abajo en chiquito, para comparar entre ellas.
+    const nombreSucursal = findSucursal(sucursalActualId)?.nombre || '';
+    $('#invColDisponibles').textContent = nombreSucursal ? `Disponibles (${nombreSucursal})` : 'Disponibles';
+
     if (!lista.length) {
         $('#inventarioBody').innerHTML = `<tr><td colspan="8" class="empty-state">No se encontraron modelos</td></tr>`;
         return;
     }
 
     $('#inventarioBody').innerHTML = lista.map(p => {
-        const cant = stockDisponible(p.id);
+        const cant = stockEnSucursal(p.id, sucursalActualId);
         const est = estadoStock(cant);
-        // Debajo del total, un desglose chiquito de cuánto hay en cada sucursal — así de un
-        // vistazo se ve si conviene traer stock de otra tienda antes de pedir un ingreso nuevo.
+        // Debajo del total de la sucursal elegida, un desglose chiquito de cuánto hay en cada
+        // una — así de un vistazo se ve si conviene traer stock de otra tienda antes de pedir
+        // un ingreso nuevo.
         const desglose = (p.stockPorSucursal || [])
             .map(s => `${s.sucursal}: ${s.cantidad}`).join(' · ');
         return `
