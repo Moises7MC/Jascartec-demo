@@ -283,9 +283,11 @@ async function enterApp() {
 }
 
 // ===================== SUCURSALES (contexto) =====================
-// Decide con qué sucursal empieza a trabajar la sesión: al Vendedor le queda fija en la suya
-// (o en la primera activa, si por algún motivo no tiene una asignada); el Administrador
-// retoma la última que eligió en este navegador, o la primera activa si es la primera vez.
+// sucursalActualId puede ser un id de sucursal (número) o el texto 'todas' — este último
+// solo lo puede elegir el Administrador, y significa "ver el negocio completo, las 3 juntas".
+// Decide con qué arranca la sesión: al Vendedor le queda fija en la suya (o en la primera
+// activa, si por algún motivo no tiene una asignada); el Administrador retoma lo último que
+// eligió en este navegador (incluyendo "todas"), o la primera sucursal si es la primera vez.
 function inicializarSucursalActual() {
     const activas = sucursales.filter(s => s.activa);
     if (currentUser.rol !== 'Administrador') {
@@ -294,18 +296,31 @@ function inicializarSucursalActual() {
         }
         sucursalActualId = currentUser.sucursalId ?? activas[0]?.id ?? null;
     } else {
-        const guardada = parseInt(localStorage.getItem('jascartec_sucursal_actual'));
-        sucursalActualId = activas.some(s => s.id === guardada) ? guardada : (activas[0]?.id ?? null);
+        const guardada = localStorage.getItem('jascartec_sucursal_actual');
+        if (guardada === 'todas') {
+            sucursalActualId = 'todas';
+        } else {
+            const id = parseInt(guardada);
+            sucursalActualId = activas.some(s => s.id === id) ? id : (activas[0]?.id ?? null);
+        }
     }
     poblarSelectsSucursal();
 }
 
 function cambiarSucursalActual(valor) {
-    sucursalActualId = parseInt(valor);
+    sucursalActualId = valor === 'todas' ? 'todas' : parseInt(valor);
     localStorage.setItem('jascartec_sucursal_actual', sucursalActualId);
     poblarSelectsSucursal();
     refrescarUI();
     if ($('#view-flujocaja').classList.contains('active')) renderVistaFlujoCaja();
+}
+
+// Un ingreso o una venta siempre pertenecen a UNA sucursal concreta — nunca se puede
+// registrar algo "en todas" — así que si el contexto general está en "todas", estos dos
+// formularios arrancan igual en la primera sucursal activa en vez de quedar sin elegir nada.
+function sucursalParaOperar() {
+    if (sucursalActualId !== 'todas') return sucursalActualId;
+    return sucursales.filter(s => s.activa)[0]?.id ?? '';
 }
 
 // Llena los 4 <select> de sucursal (barra superior, Registrar Ingreso, Registrar Venta y
@@ -317,13 +332,14 @@ function poblarSelectsSucursal() {
     const opciones = activas.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
 
     const topbar = $('#sucursalSelector');
-    topbar.innerHTML = opciones;
+    topbar.innerHTML = (esAdmin ? '<option value="todas">Todas las sucursales</option>' : '') + opciones;
     topbar.value = sucursalActualId;
     topbar.disabled = !esAdmin;
 
+    const sucursalFormularios = sucursalParaOperar();
     ['#ingSucursal', '#venSucursal'].forEach(sel => {
         $(sel).innerHTML = opciones;
-        $(sel).value = sucursalActualId;
+        $(sel).value = sucursalFormularios;
         $(sel).disabled = !esAdmin;
     });
 
@@ -467,7 +483,7 @@ function openModal(id) {
     }
     if (id === 'modalIngreso') {
         ingresoCart = [];
-        $('#ingSucursal').value = sucursalActualId;
+        $('#ingSucursal').value = sucursalParaOperar();
         populateSelectProveedores('#ingProveedor');
         $('#ingCategoria').innerHTML = '<option value="">Todas las categorías</option>' +
             categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
@@ -480,7 +496,7 @@ function openModal(id) {
     }
     if (id === 'modalVenta') {
         ventaCart = [];
-        $('#venSucursal').value = sucursalActualId;
+        $('#venSucursal').value = sucursalParaOperar();
         venModeloSeleccionado = null;
         ventaEquiposDisponiblesCache = [];
         seleccionarClienteVenta(null);
@@ -705,10 +721,11 @@ function renderInventario() {
         return pasaBusqueda && pasaMarca && pasaCategoria;
     });
 
-    // "Disponibles" muestra el stock de la sucursal elegida arriba (no el total del negocio) —
-    // el desglose de las 3 sucursales igual se ve abajo en chiquito, para comparar entre ellas.
-    const nombreSucursal = findSucursal(sucursalActualId)?.nombre || '';
-    $('#invColDisponibles').textContent = nombreSucursal ? `Disponibles (${nombreSucursal})` : 'Disponibles';
+    // "Disponibles" muestra el stock de la sucursal elegida arriba (o el total del negocio si
+    // está en "Todas las sucursales") — el desglose de las 3 igual se ve abajo en chiquito.
+    const esTodasSucursales = sucursalActualId === 'todas';
+    const nombreSucursal = esTodasSucursales ? 'Todas las sucursales' : (findSucursal(sucursalActualId)?.nombre || '');
+    $('#invColDisponibles').textContent = `Disponibles (${nombreSucursal})`;
 
     if (!lista.length) {
         $('#inventarioBody').innerHTML = `<tr><td colspan="8" class="empty-state">No se encontraron modelos</td></tr>`;
@@ -716,7 +733,7 @@ function renderInventario() {
     }
 
     $('#inventarioBody').innerHTML = lista.map(p => {
-        const cant = stockEnSucursal(p.id, sucursalActualId);
+        const cant = esTodasSucursales ? stockDisponible(p.id) : stockEnSucursal(p.id, sucursalActualId);
         const est = estadoStock(cant);
         // Debajo del total de la sucursal elegida, un desglose chiquito de cuánto hay en cada
         // una — así de un vistazo se ve si conviene traer stock de otra tienda antes de pedir
@@ -1262,8 +1279,9 @@ function renderIngresos() {
     const desde = $('#ingDesde').value;
     const hasta = $('#ingHasta').value;
 
-    // Igual que Inventario y Ventas: la lista se filtra por la sucursal elegida arriba.
-    let lista = ingresos.filter(i => i.sucursalId === sucursalActualId)
+    // Igual que Inventario y Ventas: la lista se filtra por la sucursal elegida arriba
+    // ("Todas las sucursales" no filtra nada, muestra los ingresos de las 3 juntos).
+    let lista = ingresos.filter(i => sucursalActualId === 'todas' || i.sucursalId === sucursalActualId)
         .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
     if (busqueda) {
         lista = lista.filter(i => {
@@ -1283,7 +1301,7 @@ function renderIngresos() {
     }
 
     if (!lista.length) {
-        $('#ingresosBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
+        $('#ingresosBody').innerHTML = '<tr><td colspan="8" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
         return;
     }
     $('#ingresosBody').innerHTML = lista.map(i => {
@@ -1293,6 +1311,7 @@ function renderIngresos() {
             <tr>
                 <td>${formatDate(i.fecha)}</td>
                 <td>${i.proveedor}</td>
+                <td>${i.sucursal}</td>
                 <td>${i.numeroFactura || '—'}</td>
                 <td>${cantLineas}</td>
                 <td>${formatPEN(total)}</td>
@@ -1941,14 +1960,14 @@ async function registrarAbono(ventaId) {
 
 function renderVentas() {
     if (!ventas.length) {
-        $('#ventasBody').innerHTML = '<tr><td colspan="6" class="empty-state">Aún no hay ventas registradas</td></tr>';
+        $('#ventasBody').innerHTML = '<tr><td colspan="7" class="empty-state">Aún no hay ventas registradas</td></tr>';
         return;
     }
 
     // Tanto las tarjetas de arriba como la tabla se filtran por la sucursal elegida en la
     // barra superior — igual que Inventario, para que Ventas siempre muestre "lo de esta
-    // tienda", no el negocio completo mezclado.
-    const ventasSucursal = ventas.filter(v => v.sucursalId === sucursalActualId);
+    // tienda" (o el negocio completo si está en "Todas las sucursales").
+    const ventasSucursal = ventas.filter(v => sucursalActualId === 'todas' || v.sucursalId === sucursalActualId);
     const activas = ventasSucursal.filter(v => !ventaEstaAnulada(v));
     const totalFacturado = activas.reduce((s, v) => s + ventaTotal(v), 0);
     $('#ventasTotalFacturado').textContent = formatPEN(totalFacturado);
@@ -1977,7 +1996,7 @@ function renderVentas() {
     }
 
     if (!lista.length) {
-        $('#ventasBody').innerHTML = '<tr><td colspan="6" class="empty-state">No se encontraron ventas con esos filtros</td></tr>';
+        $('#ventasBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron ventas con esos filtros</td></tr>';
         return;
     }
 
@@ -1988,6 +2007,7 @@ function renderVentas() {
             <tr style="${anulada ? 'opacity:.55;' : ''}">
                 <td><strong style="${anulada ? 'text-decoration:line-through;' : ''}">${v.numBoleta}</strong></td>
                 <td>${formatDate(v.fecha)} <small class="muted">${formatHora(v.creadoEn)}</small></td>
+                <td>${v.sucursal}</td>
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.items.length}</td>
                 <td>${formatPEN(ventaTotal(v))}</td>
@@ -2039,7 +2059,7 @@ function cambiarTabVentas(tab) {
 
 function renderCreditos() {
     // Mismo criterio que Ventas/Ingresos/Caja: filtrado por la sucursal elegida arriba.
-    const creditos = ventasActivas().filter(v => v.formaPago === 'Crédito' && v.sucursalId === sucursalActualId);
+    const creditos = ventasActivas().filter(v => v.formaPago === 'Crédito' && (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId));
 
     const totalPorCobrar = creditos.reduce((s, v) => s + ventaSaldoPendiente(v), 0);
     $('#credTotalPorCobrar').textContent = formatPEN(totalPorCobrar);
@@ -2053,7 +2073,7 @@ function renderCreditos() {
     }
 
     if (!lista.length) {
-        $('#creditosBody').innerHTML = `<tr><td colspan="9" class="empty-state">${busqueda ? 'No se encontraron créditos con esa búsqueda' : 'Aún no hay ventas a crédito registradas'}</td></tr>`;
+        $('#creditosBody').innerHTML = `<tr><td colspan="10" class="empty-state">${busqueda ? 'No se encontraron créditos con esa búsqueda' : 'Aún no hay ventas a crédito registradas'}</td></tr>`;
         return;
     }
 
@@ -2066,6 +2086,7 @@ function renderCreditos() {
         return `
             <tr>
                 <td><strong>${v.numBoleta}</strong></td>
+                <td>${v.sucursal}</td>
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.clienteDocumento || '—'}</td>
                 <td>${formatPEN(totalAPagar)}</td>
@@ -2402,6 +2423,9 @@ async function renderVistaFlujoCaja() {
 }
 
 async function cargarCajaActual() {
+    // Cada sucursal maneja su propia caja por separado — no existe "la caja de todas juntas",
+    // así que con "Todas las sucursales" elegida ni se consulta: hay que elegir una puntual.
+    if (sucursalActualId === 'todas') { cajaActual = null; renderEstadoCaja(); return; }
     try {
         cajaActual = await api.get(`/caja/abierta?sucursalId=${sucursalActualId}`);
     } catch (err) {
@@ -2412,6 +2436,18 @@ async function cargarCajaActual() {
 
 function renderEstadoCaja() {
     const el = $('#cajaEstadoContainer');
+    if (sucursalActualId === 'todas') {
+        el.innerHTML = `
+            <div class="card caja-card caja-card--cerrada">
+                <div class="caja-card__icon"><i class='bx bx-store-alt'></i></div>
+                <div class="caja-card__texto">
+                    <h3>Elige una sucursal para ver o abrir su caja</h3>
+                    <p class="muted">Cada sucursal tiene su propia caja, independiente de las demás — selecciona una arriba para gestionarla.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
     const nombreSucursal = findSucursal(sucursalActualId)?.nombre || '';
     if (!cajaActual) {
         el.innerHTML = `
@@ -2550,18 +2586,21 @@ $('#formMovimientoCaja').addEventListener('submit', async (e) => {
 async function cargarHistorialCaja() {
     let historial = [];
     try {
-        // Igual que Inventario/Ventas/Ingresos: el historial se filtra por la sucursal elegida.
-        historial = await api.get(`/caja?sucursalId=${sucursalActualId}`);
+        // Igual que Inventario/Ventas/Ingresos: el historial se filtra por la sucursal elegida
+        // ("Todas las sucursales" no manda el filtro, trae las cajas de las 3 juntas).
+        const query = sucursalActualId === 'todas' ? '' : `?sucursalId=${sucursalActualId}`;
+        historial = await api.get(`/caja${query}`);
     } catch (err) {
         historial = [];
     }
     if (!historial.length) {
-        $('#cajaHistorialBody').innerHTML = '<tr><td colspan="8" class="empty-state">Todavía no se registró ninguna caja</td></tr>';
+        $('#cajaHistorialBody').innerHTML = '<tr><td colspan="9" class="empty-state">Todavía no se registró ninguna caja</td></tr>';
         return;
     }
     $('#cajaHistorialBody').innerHTML = historial.map(c => `
         <tr>
             <td>${formatDateLong(c.fecha)}</td>
+            <td>${c.sucursal}</td>
             <td>${c.usuarioApertura}</td>
             <td>${formatPEN(c.montoInicial)}</td>
             <td>${c.usuarioCierre || '—'}</td>
