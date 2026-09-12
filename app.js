@@ -1888,6 +1888,7 @@ function abrirGestionPago(ventaId) {
     $('#gestionPagoContent').innerHTML = `
         <div class="detalle-grid">
             <div><div class="label">Cliente</div><div class="value">${nombreClienteVenta(v)}</div></div>
+            <div><div class="label">Sucursal</div><div class="value">${v.sucursal}</div></div>
             <div><div class="label">Fecha de venta</div><div class="value">${formatDateLong(v.fecha)}</div></div>
             <div><div class="label">Total equipo</div><div class="value">${formatPEN(total)}</div></div>
             ${recargo > 0 ? `<div><div class="label">Recargo por crédito</div><div class="value">${formatPEN(recargo)}</div></div>` : ''}
@@ -2051,7 +2052,7 @@ function renderCreditos() {
     }
 
     if (!lista.length) {
-        $('#creditosBody').innerHTML = `<tr><td colspan="9" class="empty-state">${busqueda ? 'No se encontraron créditos con esa búsqueda' : 'Aún no hay ventas a crédito registradas'}</td></tr>`;
+        $('#creditosBody').innerHTML = `<tr><td colspan="10" class="empty-state">${busqueda ? 'No se encontraron créditos con esa búsqueda' : 'Aún no hay ventas a crédito registradas'}</td></tr>`;
         return;
     }
 
@@ -2064,6 +2065,7 @@ function renderCreditos() {
         return `
             <tr>
                 <td><strong>${v.numBoleta}</strong></td>
+                <td>${v.sucursal}</td>
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.clienteDocumento || '—'}</td>
                 <td>${formatPEN(totalAPagar)}</td>
@@ -2240,6 +2242,7 @@ function exportarReporteExcel() {
         'Boleta': v.numBoleta,
         'Fecha': formatDateLong(v.fecha),
         'Hora': formatHora(v.creadoEn),
+        'Sucursal': v.sucursal,
         'Cliente': nombreClienteVenta(v),
         'Documento': v.clienteDocumento || '',
         'Forma de pago': v.formaPago,
@@ -2270,8 +2273,8 @@ function exportarReportePDF() {
 
     doc.autoTable({
         startY: 38,
-        head: [['Boleta', 'Fecha', 'Cliente', 'Forma de pago', 'Total', 'Estado']],
-        body: lista.map(v => [v.numBoleta, formatDate(v.fecha), nombreClienteVenta(v), v.formaPago, formatPEN(ventaTotal(v)), ventaEstaAnulada(v) ? 'Anulada' : 'Activa']),
+        head: [['Boleta', 'Fecha', 'Sucursal', 'Cliente', 'Forma de pago', 'Total', 'Estado']],
+        body: lista.map(v => [v.numBoleta, formatDate(v.fecha), v.sucursal, nombreClienteVenta(v), v.formaPago, formatPEN(ventaTotal(v)), ventaEstaAnulada(v) ? 'Anulada' : 'Activa']),
         styles: { fontSize: 8 },
         headStyles: { fillColor: [16, 145, 224] }
     });
