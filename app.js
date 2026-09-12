@@ -2038,7 +2038,8 @@ function cambiarTabVentas(tab) {
 }
 
 function renderCreditos() {
-    const creditos = ventasActivas().filter(v => v.formaPago === 'Crédito');
+    // Mismo criterio que Ventas/Ingresos/Caja: filtrado por la sucursal elegida arriba.
+    const creditos = ventasActivas().filter(v => v.formaPago === 'Crédito' && v.sucursalId === sucursalActualId);
 
     const totalPorCobrar = creditos.reduce((s, v) => s + ventaSaldoPendiente(v), 0);
     $('#credTotalPorCobrar').textContent = formatPEN(totalPorCobrar);
@@ -2052,7 +2053,7 @@ function renderCreditos() {
     }
 
     if (!lista.length) {
-        $('#creditosBody').innerHTML = `<tr><td colspan="10" class="empty-state">${busqueda ? 'No se encontraron créditos con esa búsqueda' : 'Aún no hay ventas a crédito registradas'}</td></tr>`;
+        $('#creditosBody').innerHTML = `<tr><td colspan="9" class="empty-state">${busqueda ? 'No se encontraron créditos con esa búsqueda' : 'Aún no hay ventas a crédito registradas'}</td></tr>`;
         return;
     }
 
@@ -2065,7 +2066,6 @@ function renderCreditos() {
         return `
             <tr>
                 <td><strong>${v.numBoleta}</strong></td>
-                <td>${v.sucursal}</td>
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.clienteDocumento || '—'}</td>
                 <td>${formatPEN(totalAPagar)}</td>
