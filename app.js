@@ -63,10 +63,16 @@ let ingresos = [];
 let facturas = [];
 let ventas = [];
 let currentUser = null;
+let sucursales = [];
+// "Contexto" de sucursal con el que se trabaja ahora mismo: define en qué sucursal se registra
+// un ingreso/venta nuevo y qué caja se muestra en Flujo de Caja. El Administrador puede
+// cambiarlo desde el selector de la barra superior; al Vendedor le queda fijo en la suya.
+let sucursalActualId = null;
 
 // ===================== FINDERS =====================
 const findProducto = (id) => productos.find(p => p.id === id);
 const findProveedor = (id) => proveedores.find(p => p.id === id);
+const findSucursal = (id) => sucursales.find(s => s.id === id);
 const findCliente = (id) => clientes.find(c => c.id === id);
 const findMarca = (id) => marcas.find(m => m.id === id);
 const findCategoria = (id) => categorias.find(c => c.id === id);
@@ -117,6 +123,11 @@ const productoImagenSrc = (p) => (p && p.imagenUrl) ? p.imagenUrl : placeholderI
 // El conteo de disponibles ya lo calcula el backend (producto.stockDisponible);
 // aquí solo lo leemos, para no duplicar esa cuenta en el navegador.
 const stockDisponible = (productoId) => findProducto(productoId)?.stockDisponible ?? 0;
+// A diferencia de stockDisponible (total agregado de todas las sucursales), esto lee el
+// desglose por sucursal que ya viene en el producto — usado al vender, donde el stock que
+// importa es el de la sucursal donde se está haciendo la venta, no el total del negocio.
+const stockEnSucursal = (productoId, sucursalId) =>
+    findProducto(productoId)?.stockPorSucursal?.find(s => s.sucursalId === sucursalId)?.cantidad ?? 0;
 const estadoStock = (cant) => {
     if (cant === 0) return { tag: 'tag-red', texto: 'Agotado' };
     if (cant <= STOCK_MINIMO) return { tag: 'tag-amber', texto: 'Stock bajo' };
@@ -193,6 +204,7 @@ $('#confirmCancelBtn').addEventListener('click', () => resolveConfirm(false));
 
 // ===================== CARGA DE DATOS DESDE LA API =====================
 async function cargarNegocio() { negocio = await api.get('/negocio'); }
+async function cargarSucursales() { sucursales = await api.get('/sucursales'); }
 async function cargarUsuarios() { usuarios = await api.get('/usuarios'); }
 async function cargarMarcas() { marcas = await api.get('/marcas'); }
 async function cargarCategorias() { categorias = await api.get('/categorias'); }
@@ -208,7 +220,7 @@ async function cargarVentas() { ventas = await api.get('/ventas'); }
 // Vendedor no le pedimos esos datos, así evitamos un 403 innecesario.
 async function cargarDatosIniciales() {
     const esAdmin = currentUser.rol === 'Administrador';
-    const tareas = [cargarNegocio(), cargarMarcas(), cargarCategorias(), cargarClientes(), cargarProductos(), cargarVentas()];
+    const tareas = [cargarNegocio(), cargarSucursales(), cargarMarcas(), cargarCategorias(), cargarClientes(), cargarProductos(), cargarVentas()];
     if (esAdmin) tareas.push(cargarProveedores(), cargarIngresos(), cargarFacturas(), cargarUsuarios());
     await Promise.all(tareas);
     if (!esAdmin) { proveedores = []; ingresos = []; facturas = []; usuarios = []; }
@@ -254,9 +266,67 @@ async function enterApp() {
         return;
     }
 
+    inicializarSucursalActual();
     renderAll();
     initCharts();
     toast(`👋 Bienvenido, ${currentUser.nombre}`, 'success');
+}
+
+// ===================== SUCURSALES (contexto) =====================
+// Decide con qué sucursal empieza a trabajar la sesión: al Vendedor le queda fija en la suya
+// (o en la primera activa, si por algún motivo no tiene una asignada); el Administrador
+// retoma la última que eligió en este navegador, o la primera activa si es la primera vez.
+function inicializarSucursalActual() {
+    const activas = sucursales.filter(s => s.activa);
+    if (currentUser.rol !== 'Administrador') {
+        if (currentUser.sucursalId == null) {
+            toast('⚠️ Tu usuario no tiene una sucursal asignada — pídele al Administrador que te asigne una en Usuarios', 'error');
+        }
+        sucursalActualId = currentUser.sucursalId ?? activas[0]?.id ?? null;
+    } else {
+        const guardada = parseInt(localStorage.getItem('jascartec_sucursal_actual'));
+        sucursalActualId = activas.some(s => s.id === guardada) ? guardada : (activas[0]?.id ?? null);
+    }
+    poblarSelectsSucursal();
+}
+
+function cambiarSucursalActual(valor) {
+    sucursalActualId = parseInt(valor);
+    localStorage.setItem('jascartec_sucursal_actual', sucursalActualId);
+    poblarSelectsSucursal();
+    refrescarUI();
+    if ($('#view-flujocaja').classList.contains('active')) renderVistaFlujoCaja();
+}
+
+// Llena los 4 <select> de sucursal (barra superior, Registrar Ingreso, Registrar Venta y
+// Usuarios) y bloquea el de la barra superior y los de los formularios cuando el usuario
+// es Vendedor — para él, la sucursal nunca es una decisión, es un dato fijo de su cuenta.
+function poblarSelectsSucursal() {
+    const esAdmin = currentUser.rol === 'Administrador';
+    const activas = sucursales.filter(s => s.activa);
+    const opciones = activas.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
+
+    const topbar = $('#sucursalSelector');
+    topbar.innerHTML = opciones;
+    topbar.value = sucursalActualId;
+    topbar.disabled = !esAdmin;
+
+    ['#ingSucursal', '#venSucursal'].forEach(sel => {
+        $(sel).innerHTML = opciones;
+        $(sel).value = sucursalActualId;
+        $(sel).disabled = !esAdmin;
+    });
+
+    $('#usrSucursal').innerHTML = '<option value="">Todas las sucursales (Administrador)</option>' + opciones;
+}
+
+function cambiarSucursalVenta() {
+    if (ventaCart.length) {
+        ventaCart = [];
+        renderVentaCart();
+        toast('El carrito se vació: cambiaste de sucursal y el stock disponible es otro', 'error');
+    }
+    cargarEquiposDisponiblesVenta();
 }
 
 async function logout() {
@@ -387,6 +457,7 @@ function openModal(id) {
     }
     if (id === 'modalIngreso') {
         ingresoCart = [];
+        $('#ingSucursal').value = sucursalActualId;
         populateSelectProveedores('#ingProveedor');
         $('#ingCategoria').innerHTML = '<option value="">Todas las categorías</option>' +
             categorias.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
@@ -399,6 +470,7 @@ function openModal(id) {
     }
     if (id === 'modalVenta') {
         ventaCart = [];
+        $('#venSucursal').value = sucursalActualId;
         venModeloSeleccionado = null;
         ventaEquiposDisponiblesCache = [];
         seleccionarClienteVenta(null);
@@ -444,6 +516,7 @@ function openModal(id) {
         $('#modalUsuarioTitle').textContent = 'Nuevo Usuario';
         $('#usrId').value = '';
         $('#formUsuario').reset();
+        $('#usrSucursal').value = '';
     }
     if (id === 'modalFactura') {
         $('#facNumero').value = '';
@@ -624,6 +697,10 @@ function renderInventario() {
     $('#inventarioBody').innerHTML = lista.map(p => {
         const cant = stockDisponible(p.id);
         const est = estadoStock(cant);
+        // Debajo del total, un desglose chiquito de cuánto hay en cada sucursal — así de un
+        // vistazo se ve si conviene traer stock de otra tienda antes de pedir un ingreso nuevo.
+        const desglose = (p.stockPorSucursal || [])
+            .map(s => `${s.sucursal}: ${s.cantidad}`).join(' · ');
         return `
             <tr>
                 <td>
@@ -634,7 +711,7 @@ function renderInventario() {
                 </td>
                 <td>${p.categoria}</td>
                 <td>${p.marca}</td>
-                <td>${cant}</td>
+                <td>${cant}<br><small class="muted">${desglose}</small></td>
                 <td>${formatPEN(p.precio)}</td>
                 <td><span class="tag ${est.tag}">${est.texto}</span></td>
                 <td>${formatFechaHora(p.creadoEn)}</td>
@@ -1082,13 +1159,15 @@ function renderIngresoCart() {
 
 async function confirmarIngreso() {
     const proveedorId = parseInt($('#ingProveedor').value);
+    const sucursalId = parseInt($('#ingSucursal').value);
     const numeroFactura = $('#ingFactura').value.trim() || null;
 
     if (!proveedorId) { toast('✗ Seleccione un proveedor', 'error'); return; }
+    if (!sucursalId) { toast('✗ Seleccione la sucursal', 'error'); return; }
     if (!ingresoCart.length) { toast('✗ Agregue al menos un producto', 'error'); return; }
 
     try {
-        await api.post('/ingresos', { fecha: today(), proveedorId, numeroFactura, items: ingresoCart });
+        await api.post('/ingresos', { fecha: today(), proveedorId, numeroFactura, sucursalId, items: ingresoCart });
         toast(`✓ Ingreso registrado: ${ingresoCart.length} línea(s)`, 'success');
         closeModal('modalIngreso');
         ingresoCart = [];
@@ -1126,6 +1205,7 @@ function verIngreso(id) {
     $('#detalleIngresoContent').innerHTML = `
         <div class="detalle-grid">
             <div><div class="label">Proveedor</div><div class="value">${ing.proveedor}</div></div>
+            <div><div class="label">Sucursal</div><div class="value">${ing.sucursal}</div></div>
             <div><div class="label">N° de factura</div><div class="value">${ing.numeroFactura || 'Sin factura'}</div></div>
             <div><div class="label">Total</div><div class="value">${formatPEN(totalEquipos + totalItems)}</div></div>
             <div><div class="label">Líneas</div><div class="value">${cantLineas}</div></div>
@@ -1179,7 +1259,7 @@ function renderIngresos() {
     }
 
     if (!lista.length) {
-        $('#ingresosBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
+        $('#ingresosBody').innerHTML = '<tr><td colspan="8" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
         return;
     }
     $('#ingresosBody').innerHTML = lista.map(i => {
@@ -1189,6 +1269,7 @@ function renderIngresos() {
             <tr>
                 <td>${formatDate(i.fecha)}</td>
                 <td>${i.proveedor}</td>
+                <td>${i.sucursal}</td>
                 <td>${i.numeroFactura || '—'}</td>
                 <td>${cantLineas}</td>
                 <td>${formatPEN(total)}</td>
@@ -1482,8 +1563,9 @@ async function cargarEquiposDisponiblesVenta() {
     if (!p || !p.requiereImei) { $('#venEquipoSel').innerHTML = ''; ventaEquiposDisponiblesCache = []; return; }
 
     const usados = ventaCart.map(it => it.equipoId);
+    const sucursalId = parseInt($('#venSucursal').value);
     try {
-        const disponibles = await api.get(`/equipos/disponibles?productoId=${venModeloSeleccionado}`);
+        const disponibles = await api.get(`/equipos/disponibles?productoId=${venModeloSeleccionado}&sucursalId=${sucursalId}`);
         ventaEquiposDisponiblesCache = disponibles.filter(e => !usados.includes(e.id));
     } catch (err) {
         toast(`✗ ${err.message}`, 'error');
@@ -1510,9 +1592,11 @@ function agregarProductoVenta() {
         cargarEquiposDisponiblesVenta();
     } else {
         const cantidad = parseInt($('#venCantidad').value);
+        const sucursalId = parseInt($('#venSucursal').value);
         const yaEnCarrito = ventaCart.filter(it => it.productoId === productoId).reduce((s, it) => s + it.cantidad, 0);
+        const disponibleAqui = stockEnSucursal(productoId, sucursalId);
         if (!cantidad || cantidad < 1) { toast('✗ Ingrese una cantidad válida', 'error'); return; }
-        if (yaEnCarrito + cantidad > stockDisponible(productoId)) { toast(`✗ Stock insuficiente: disponible ${stockDisponible(productoId) - yaEnCarrito}`, 'error'); return; }
+        if (yaEnCarrito + cantidad > disponibleAqui) { toast(`✗ Stock insuficiente en esta sucursal: disponible ${disponibleAqui - yaEnCarrito}`, 'error'); return; }
 
         const existente = ventaCart.find(it => it.productoId === productoId && !it.equipoId);
         if (existente) existente.cantidad += cantidad;
@@ -1554,8 +1638,10 @@ async function confirmarVenta() {
     if (!ventaCart.length) { toast('✗ Agregue al menos un producto', 'error'); return; }
 
     const formaPago = $('#venFormaPago').value;
+    const sucursalId = parseInt($('#venSucursal').value);
     const payload = {
         clienteId,
+        sucursalId,
         items: ventaCart.map(it => it.equipoId
             ? { equipoId: it.equipoId }
             : { productoId: it.productoId, cantidad: it.cantidad }),
@@ -1630,6 +1716,7 @@ function construirTicketHTML(v) {
     return `
         <div class="ticket__center">
             <div class="ticket__marca">${negocio.razonSocial}</div>
+            <div>${v.sucursal}</div>
             <div>${negocio.direccion}</div>
             <div>Tel: ${negocio.telefono}</div>
         </div>
@@ -1718,6 +1805,7 @@ function renderBoleta(v) {
                 <div><div class="label">Dirección</div><div class="value">${v.clienteDireccion || '—'}</div></div>
                 <div><div class="label">Fecha</div><div class="value">${formatDateLong(v.fecha)}</div></div>
                 <div><div class="label">Forma de pago</div><div class="value">${v.formaPago}</div></div>
+                <div><div class="label">Sucursal</div><div class="value">${v.sucursal}</div></div>
             </div>
             <div class="table-wrap" style="margin-top:1rem;">
                 <table class="table table--sm">
@@ -1829,7 +1917,7 @@ async function registrarAbono(ventaId) {
 
 function renderVentas() {
     if (!ventas.length) {
-        $('#ventasBody').innerHTML = '<tr><td colspan="6" class="empty-state">Aún no hay ventas registradas</td></tr>';
+        $('#ventasBody').innerHTML = '<tr><td colspan="7" class="empty-state">Aún no hay ventas registradas</td></tr>';
         return;
     }
 
@@ -1863,7 +1951,7 @@ function renderVentas() {
     }
 
     if (!lista.length) {
-        $('#ventasBody').innerHTML = '<tr><td colspan="6" class="empty-state">No se encontraron ventas con esos filtros</td></tr>';
+        $('#ventasBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron ventas con esos filtros</td></tr>';
         return;
     }
 
@@ -1874,6 +1962,7 @@ function renderVentas() {
             <tr style="${anulada ? 'opacity:.55;' : ''}">
                 <td><strong style="${anulada ? 'text-decoration:line-through;' : ''}">${v.numBoleta}</strong></td>
                 <td>${formatDate(v.fecha)} <small class="muted">${formatHora(v.creadoEn)}</small></td>
+                <td>${v.sucursal}</td>
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.items.length}</td>
                 <td>${formatPEN(ventaTotal(v))}</td>
@@ -2287,7 +2376,7 @@ async function renderVistaFlujoCaja() {
 
 async function cargarCajaActual() {
     try {
-        cajaActual = await api.get('/caja/abierta');
+        cajaActual = await api.get(`/caja/abierta?sucursalId=${sucursalActualId}`);
     } catch (err) {
         cajaActual = null;
     }
@@ -2296,12 +2385,13 @@ async function cargarCajaActual() {
 
 function renderEstadoCaja() {
     const el = $('#cajaEstadoContainer');
+    const nombreSucursal = findSucursal(sucursalActualId)?.nombre || '';
     if (!cajaActual) {
         el.innerHTML = `
             <div class="card caja-card caja-card--cerrada">
                 <div class="caja-card__icon"><i class='bx bx-lock-alt'></i></div>
                 <div class="caja-card__texto">
-                    <h3>No hay una caja abierta</h3>
+                    <h3>No hay una caja abierta en ${nombreSucursal}</h3>
                     <p class="muted">Abrí la caja al empezar el día, contando el efectivo físico que hay ahora.</p>
                 </div>
                 <button type="button" class="btn btn--primary" onclick="abrirModalAbrirCaja()">Abrir caja</button>
@@ -2326,7 +2416,7 @@ function renderEstadoCaja() {
         <div class="card caja-card caja-card--abierta">
             <div class="caja-card__header">
                 <div>
-                    <h3>Caja abierta — ${formatDateLong(c.fecha)}</h3>
+                    <h3>Caja abierta — ${c.sucursal} — ${formatDateLong(c.fecha)}</h3>
                     <p class="muted">Abrió ${c.usuarioApertura} a las ${formatHora(c.abiertaEn)}${c.observacionesApertura ? ` · ${c.observacionesApertura}` : ''}</p>
                 </div>
                 <button type="button" class="btn btn--danger" onclick="abrirModalCerrarCaja()">Cerrar caja</button>
@@ -2355,7 +2445,7 @@ $('#formAbrirCaja').addEventListener('submit', async (e) => {
     const montoInicial = parseFloat($('#cajaAperturaMonto').value);
     if (isNaN(montoInicial) || montoInicial < 0) { toast('✗ Ingrese un monto inicial válido', 'error'); return; }
     try {
-        cajaActual = await api.post('/caja/abrir', { montoInicial, observaciones: $('#cajaAperturaObs').value.trim() || null });
+        cajaActual = await api.post('/caja/abrir', { sucursalId: sucursalActualId, montoInicial, observaciones: $('#cajaAperturaObs').value.trim() || null });
         toast('✓ Caja abierta', 'success');
         closeModal('modalAbrirCaja');
         renderEstadoCaja();
@@ -2438,12 +2528,13 @@ async function cargarHistorialCaja() {
         historial = [];
     }
     if (!historial.length) {
-        $('#cajaHistorialBody').innerHTML = '<tr><td colspan="8" class="empty-state">Todavía no se registró ninguna caja</td></tr>';
+        $('#cajaHistorialBody').innerHTML = '<tr><td colspan="9" class="empty-state">Todavía no se registró ninguna caja</td></tr>';
         return;
     }
     $('#cajaHistorialBody').innerHTML = historial.map(c => `
         <tr>
             <td>${formatDateLong(c.fecha)}</td>
+            <td>${c.sucursal}</td>
             <td>${c.usuarioApertura}</td>
             <td>${formatPEN(c.montoInicial)}</td>
             <td>${c.usuarioCierre || '—'}</td>
@@ -3090,14 +3181,16 @@ $('#formUsuario').addEventListener('submit', async (e) => {
     const usuario = $('#usrUsuario').value.trim();
     const rol = $('#usrRol').value;
     const password = $('#usrPassword').value;
+    const sucursalIdRaw = $('#usrSucursal').value;
+    const sucursalId = sucursalIdRaw ? parseInt(sucursalIdRaw) : null;
 
     try {
         if (id) {
-            await api.put(`/usuarios/${id}`, { usuario, password: password || null, nombre, rol, activo: true });
+            await api.put(`/usuarios/${id}`, { usuario, password: password || null, nombre, rol, activo: true, sucursalId });
             toast(`✓ Usuario "${nombre}" actualizado`, 'success');
         } else {
             if (!password) { toast('✗ Ingrese una contraseña para el nuevo usuario', 'error'); return; }
-            await api.post('/usuarios', { usuario, password, nombre, rol });
+            await api.post('/usuarios', { usuario, password, nombre, rol, sucursalId });
             toast(`✓ Usuario "${nombre}" agregado`, 'success');
         }
         closeModal('modalUsuario');
@@ -3118,6 +3211,7 @@ function editarUsuario(id) {
     $('#usrUsuario').value = u.usuario;
     $('#usrRol').value = u.rol;
     $('#usrPassword').value = '';
+    $('#usrSucursal').value = u.sucursalId ?? '';
 }
 
 async function eliminarUsuario(id) {
@@ -3146,6 +3240,7 @@ function renderUsuarios() {
                 <div class="entity-name">${u.nombre}${esUsuarioActual ? ' <small class="muted">(tú)</small>' : ''}</div>
                 <span class="tag ${u.rol === 'Administrador' ? 'tag-dark' : 'tag-green'}">${u.rol}</span>
                 <div class="entity-info">👤 ${u.usuario}</div>
+                <div class="entity-info">🏬 ${u.sucursal || 'Todas las sucursales'}</div>
                 <div class="entity-actions">
                     <button class="btn-small" onclick="editarUsuario(${u.id})">Editar</button>
                     ${!esUsuarioActual && !esUnicoAdmin ? `<button class="btn-small-danger" onclick="eliminarUsuario(${u.id})">Eliminar</button>` : ''}
