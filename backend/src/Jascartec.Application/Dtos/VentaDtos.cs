@@ -12,7 +12,8 @@ public record CuotaCronogramaDto(int Numero, decimal Monto, DateOnly FechaVencim
 
 public record VentaDto(
     int Id, string NumBoleta, DateOnly Fecha, int? ClienteId, string Cliente, string? ClienteDocumento,
-    string? ClienteDireccion, int SucursalId, string Sucursal, string FormaPago, string? MedioPago, DateOnly? FechaPagoAcordada,
+    string? ClienteDireccion, int SucursalId, string Sucursal, int? VendedorId, string? Vendedor,
+    string FormaPago, string? MedioPago, DateOnly? FechaPagoAcordada,
     IReadOnlyList<VentaItemDto> Items, IReadOnlyList<AbonoDto> Abonos,
     decimal Total, decimal MontoPagado, decimal SaldoPendiente,
     string Estado, DateOnly? FechaAnulacion, DateTimeOffset CreadoEn,

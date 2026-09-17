@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Jascartec.Application.Dtos;
 using Jascartec.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -10,6 +11,8 @@ namespace Jascartec.Api.Controllers;
 [Authorize] // Administrador y Vendedor registran ventas por igual
 public class VentasController(IVentaService ventaService) : ControllerBase
 {
+    private int UsuarioActualId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<VentaDto>>> Listar(CancellationToken ct) =>
         Ok(await ventaService.ListarAsync(ct));
@@ -20,7 +23,7 @@ public class VentasController(IVentaService ventaService) : ControllerBase
 
     [HttpPost]
     public async Task<ActionResult<VentaDto>> Crear(CrearVentaRequest request, CancellationToken ct) =>
-        Ok(await ventaService.CrearAsync(request, ct));
+        Ok(await ventaService.CrearAsync(request, UsuarioActualId, ct));
 
     [HttpPost("{id:int}/abonos")]
     public async Task<ActionResult<VentaDto>> RegistrarAbono(int id, RegistrarAbonoRequest request, CancellationToken ct) =>

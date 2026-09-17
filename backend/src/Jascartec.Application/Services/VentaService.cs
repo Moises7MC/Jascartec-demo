@@ -19,7 +19,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         return ToDto(venta);
     }
 
-    public async Task<VentaDto> CrearAsync(CrearVentaRequest request, CancellationToken ct = default)
+    public async Task<VentaDto> CrearAsync(CrearVentaRequest request, int usuarioId, CancellationToken ct = default)
     {
         if (request.Items.Count == 0)
             throw new BusinessRuleException("La venta debe tener al menos un producto.");
@@ -135,6 +135,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             Fecha = fecha,
             ClienteId = request.ClienteId,
             SucursalId = request.SucursalId,
+            UsuarioId = usuarioId,
             FormaPago = formaPago,
             MedioPago = formaPago == FormaPago.Contado ? medioPago : null,
             FechaPagoAcordada = fechaPagoAcordada,
@@ -365,7 +366,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         return new VentaDto(
             v.Id, v.NumBoleta, v.Fecha, v.ClienteId,
             v.Cliente?.Nombre ?? "Cliente varios (sin registrar)", v.Cliente?.Documento, v.Cliente?.Direccion,
-            v.SucursalId, v.Sucursal.Nombre,
+            v.SucursalId, v.Sucursal.Nombre, v.UsuarioId, v.Usuario?.Nombre,
             v.FormaPago == FormaPago.Credito ? "Crédito" : "Contado", v.MedioPago?.ToString(), v.FechaPagoAcordada,
             items, abonos, v.Total, v.MontoPagado, v.SaldoPendiente,
             v.Estado.ToString(), v.FechaAnulacion, v.CreadoEn,

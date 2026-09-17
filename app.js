@@ -1821,6 +1821,7 @@ function construirTicketHTML(v) {
         <div class="ticket__row"><span>Fecha:</span><span>${formatDateLong(v.fecha)} ${formatHora(v.creadoEn)}</span></div>
         <div class="ticket__row"><span>Cliente:</span><span>${nombreClienteVenta(v)}</span></div>
         <div class="ticket__row"><span>Pago:</span><span>${v.formaPago}</span></div>
+        ${v.vendedor ? `<div class="ticket__row"><span>Vendedor:</span><span>${v.vendedor}</span></div>` : ''}
         <hr class="ticket__sep">
         ${filasItems}
         <hr class="ticket__sep">
@@ -1905,6 +1906,7 @@ function renderBoleta(v) {
                 <div><div class="label">Fecha</div><div class="value">${formatDateLong(v.fecha)}</div></div>
                 <div><div class="label">Forma de pago</div><div class="value">${v.formaPago}</div></div>
                 <div><div class="label">Sucursal</div><div class="value">${v.sucursal}</div></div>
+                <div><div class="label">Vendedor</div><div class="value">${v.vendedor || '—'}</div></div>
             </div>
             <div class="table-wrap" style="margin-top:1rem;">
                 <table class="table table--sm">

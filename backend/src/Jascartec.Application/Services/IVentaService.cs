@@ -6,7 +6,7 @@ public interface IVentaService
 {
     Task<IReadOnlyList<VentaDto>> ListarAsync(CancellationToken ct = default);
     Task<VentaDto> ObtenerAsync(int id, CancellationToken ct = default);
-    Task<VentaDto> CrearAsync(CrearVentaRequest request, CancellationToken ct = default);
+    Task<VentaDto> CrearAsync(CrearVentaRequest request, int usuarioId, CancellationToken ct = default);
     Task<VentaDto> RegistrarAbonoAsync(int ventaId, RegistrarAbonoRequest request, CancellationToken ct = default);
     Task<VentaDto> AnularAsync(int id, CancellationToken ct = default);
 }

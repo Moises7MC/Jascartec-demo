@@ -9,6 +9,8 @@ public class Venta
     public DateOnly Fecha { get; set; }
     public int? ClienteId { get; set; } // null = "cliente varios (sin registrar)"
     public int SucursalId { get; set; }
+    // Quién atendió la venta — null en ventas viejas de antes de que existiera este campo.
+    public int? UsuarioId { get; set; }
     public FormaPago FormaPago { get; set; } = FormaPago.Contado;
     // Solo tiene sentido en Contado (cómo se pagó la venta completa); en Crédito el medio de
     // pago real vive en cada Abono (incluido el inicial, que se guarda como el primer abono).
@@ -26,6 +28,7 @@ public class Venta
 
     public Cliente? Cliente { get; set; }
     public Sucursal Sucursal { get; set; } = null!;
+    public Usuario? Usuario { get; set; }
     public ICollection<VentaItem> Items { get; set; } = new List<VentaItem>();
     public ICollection<Abono> Abonos { get; set; } = new List<Abono>();
 
