@@ -1487,7 +1487,7 @@ function actualizarPreviewCredito() {
         return;
     }
     if (isNaN(montoInicial) || montoInicial < 0 || montoInicial >= total) {
-        preview.innerHTML = `<div class="credito-preview__vacio">Ingrese un monto inicial válido (menor a ${formatPEN(total)})</div>`;
+        preview.innerHTML = `<div class="credito-preview__vacio">Ingrese un monto otorgado válido (menor a ${formatPEN(total)})</div>`;
         return;
     }
     if (!numCuotas) {
@@ -1502,7 +1502,7 @@ function actualizarPreviewCredito() {
 
     preview.innerHTML = `
         <div class="credito-preview__resumen">
-            <div><span class="label">Inicial</span><span class="value">${formatPEN(montoInicial)} (${porcentajeInicial.toFixed(0)}%)</span></div>
+            <div><span class="label">Otorgado</span><span class="value">${formatPEN(montoInicial)} (${porcentajeInicial.toFixed(0)}%)</span></div>
             <div><span class="label">Recargo aplicado</span><span class="value value--recargo">${formatPEN(recargo)}</span></div>
             <div><span class="label">Monto a financiar</span><span class="value">${formatPEN(montoAFinanciar)}</span></div>
             <div><span class="label">Total a pagar</span><span class="value value--total">${formatPEN(total + recargo)}</span></div>
@@ -1749,8 +1749,8 @@ async function confirmarVenta() {
         const total = ventaCart.reduce((s, it) => s + it.precioUnit * it.cantidad, 0);
         const montoInicial = parseFloat($('#venMontoInicial').value);
         const numCuotas = parseInt($('#venNumCuotas').value);
-        if (isNaN(montoInicial) || montoInicial < 0) { toast('✗ Ingrese el monto inicial', 'error'); return; }
-        if (montoInicial >= total) { toast('✗ El monto inicial debe ser menor al total de la venta', 'error'); return; }
+        if (isNaN(montoInicial) || montoInicial < 0) { toast('✗ Ingrese el monto otorgado', 'error'); return; }
+        if (montoInicial >= total) { toast('✗ El monto otorgado debe ser menor al total de la venta', 'error'); return; }
         if (!numCuotas) { toast('✗ Seleccione el número de cuotas', 'error'); return; }
 
         payload.montoInicial = montoInicial;
