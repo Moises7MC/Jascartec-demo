@@ -648,6 +648,19 @@ img {
 .card__header { margin-bottom: 1rem; }
 .card__header h3 { font-size: 1rem; }
 
+/*=============== "TU DÍA" (Dashboard, panel personal del Vendedor) ===============*/
+.mi-dia-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.mi-dia-card__total { text-align: right; }
+.mi-dia-card__monto { display: block; font-size: 1.6rem; font-weight: var(--font-bold); color: var(--title-color); }
+.mi-dia-card__cant { font-size: var(--smaller-font-size); color: var(--text-color-light); }
+
 /*=============== CAJA (abrir/cerrar) ===============*/
 .caja-card--cerrada {
   display: flex;

@@ -179,6 +179,20 @@
 
                 <!-- ============== VIEW: DASHBOARD ============== -->
                 <section class="view active" id="view-dashboard">
+                    <div class="card mi-dia-card" id="miDiaCard" data-roles="Vendedor">
+                        <div class="mi-dia-card__header">
+                            <div>
+                                <h3>Tu día — <span id="miDiaSucursal">—</span></h3>
+                                <p class="muted">Así vas vendiendo hoy</p>
+                            </div>
+                            <div class="mi-dia-card__total">
+                                <span class="mi-dia-card__monto" id="miDiaMonto">S/ 0.00</span>
+                                <span class="mi-dia-card__cant" id="miDiaCantidad">0 ventas hoy</span>
+                            </div>
+                        </div>
+                        <div class="list-modal" id="miDiaLista"></div>
+                    </div>
+
                     <div class="stats-grid">
                         <div class="stat-card">
                             <div class="stat-card__icon stat-card__icon--blue"><i class='bx bx-mobile-alt'></i></div>
@@ -502,6 +516,14 @@
                                     </tr>
                                 </thead>
                                 <tbody id="reporteVentasBody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="table-wrap" style="margin-top:1.25rem;" data-roles="Administrador">
+                            <h3 class="section-subtitle">Ventas por vendedor</h3>
+                            <table class="table">
+                                <thead><tr><th>Vendedor</th><th>N° de ventas</th><th>Total vendido</th></tr></thead>
+                                <tbody id="reportePorVendedorBody"></tbody>
                             </table>
                         </div>
                     </div>

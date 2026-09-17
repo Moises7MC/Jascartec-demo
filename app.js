@@ -378,15 +378,17 @@ async function logout() {
     switchView('dashboard');
 }
 
+// Cualquier elemento con data-roles="Administrador", "Vendedor" o ambos (separados por
+// coma) se muestra u oculta según el rol de la sesión — antes solo soportaba
+// "Administrador" a mano; ahora es genérico para poder tener cosas exclusivas de Vendedor
+// también (como el panel "Tu día" del Dashboard).
 function aplicarPermisos() {
     const rol = currentUser.rol;
-    $$('.nav-item').forEach(item => {
-        const roles = (item.dataset.roles || '').split(',');
-        item.classList.toggle('hidden', !roles.includes(rol));
-    });
-    $$('[data-roles="Administrador"]').forEach(btn => {
-        if (btn.classList.contains('nav-item')) return;
-        btn.style.display = rol === 'Administrador' ? '' : 'none';
+    $$('[data-roles]').forEach(el => {
+        const roles = el.dataset.roles.split(',');
+        const visible = roles.includes(rol);
+        if (el.classList.contains('nav-item')) el.classList.toggle('hidden', !visible);
+        else el.style.display = visible ? '' : 'none';
     });
 }
 
@@ -635,6 +637,37 @@ function renderDashboard() {
     $('#statCobranzas').textContent = cobranzas;
 
     $('#statCuotasHoy').textContent = cuotasQueVencenEn(today()).length;
+
+    renderMiDia();
+}
+
+// Panel personal del Vendedor (visible también para el Administrador si él mismo hace alguna
+// venta): sus propias ventas de HOY — no las de todo el negocio ni las de sus compañeros —
+// para que vea de un vistazo cuánto lleva vendido y en qué sucursal está parado.
+function renderMiDia() {
+    const el = $('#miDiaCard');
+    if (!el) return;
+
+    $('#miDiaSucursal').textContent = currentUser.sucursal || findSucursal(sucursalActualId)?.nombre || '—';
+
+    const misVentasHoy = ventasActivas()
+        .filter(v => v.vendedorId === currentUser.id && v.fecha === today())
+        .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+
+    const total = misVentasHoy.reduce((s, v) => s + ventaTotal(v), 0);
+    $('#miDiaMonto').textContent = formatPEN(total);
+    $('#miDiaCantidad').textContent = `${misVentasHoy.length} venta${misVentasHoy.length === 1 ? '' : 's'} hoy`;
+
+    $('#miDiaLista').innerHTML = misVentasHoy.length
+        ? misVentasHoy.map(v => `
+            <div class="list-item list-item--clickable" onclick="verBoleta(${v.id})">
+                <div class="list-item__top">
+                    <div><div class="list-item__name">${v.numBoleta} · ${nombreClienteVenta(v)}</div><div class="list-item__meta">${formatHora(v.creadoEn)}</div></div>
+                    <span class="tag tag-green">${formatPEN(ventaTotal(v))}</span>
+                </div>
+            </div>
+        `).join('')
+        : '<div class="empty-state">Todavía no has registrado ninguna venta hoy</div>';
 }
 
 function initCharts() {
@@ -2253,7 +2286,9 @@ function renderReporteVentas() {
         ? formatDateLong(desde)
         : `${formatDateLong(desde)} — ${formatDateLong(hasta)}`;
 
-    const enRango = ventas.filter(v => v.fecha >= desde && v.fecha <= hasta);
+    // Igual que el resto de vistas: se respeta la sucursal elegida arriba (o el negocio
+    // completo si está en "Todas las sucursales").
+    const enRango = ventas.filter(v => (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId) && v.fecha >= desde && v.fecha <= hasta);
     const activas = enRango.filter(v => !ventaEstaAnulada(v));
     const totalVendido = activas.reduce((s, v) => s + ventaTotal(v), 0);
     const totalContado = activas.filter(v => v.formaPago !== 'Crédito').reduce((s, v) => s + ventaTotal(v), 0);
@@ -2281,6 +2316,35 @@ function renderReporteVentas() {
     }).join('') : '<tr><td colspan="6" class="empty-state">No hay ventas registradas en este período</td></tr>';
 
     renderReporteChart(desde, hasta, activas);
+    renderReportePorVendedor(activas);
+}
+
+// Solo para el Administrador: cuánto vendió cada trabajador en el período elegido — se
+// agrupa por vendedorId; las ventas de antes de que existiera este dato (o "Cliente varios"
+// hechas sin sesión identificable) caen en "Sin vendedor registrado".
+function renderReportePorVendedor(activas) {
+    const el = $('#reportePorVendedorBody');
+    if (!el) return;
+
+    const porVendedor = new Map(); // vendedorId (o null) -> { nombre, cantidad, total }
+    activas.forEach(v => {
+        const key = v.vendedorId ?? 'sin-registro';
+        const fila = porVendedor.get(key) ?? { nombre: v.vendedor || 'Sin vendedor registrado', cantidad: 0, total: 0 };
+        fila.cantidad += 1;
+        fila.total += ventaTotal(v);
+        porVendedor.set(key, fila);
+    });
+
+    const filas = [...porVendedor.values()].sort((a, b) => b.total - a.total);
+    el.innerHTML = filas.length
+        ? filas.map(f => `
+            <tr>
+                <td>${f.nombre}</td>
+                <td>${f.cantidad}</td>
+                <td>${formatPEN(f.total)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="3" class="empty-state">No hay ventas registradas en este período</td></tr>';
 }
 
 function renderReporteChart(desde, hasta, activas) {
@@ -2310,7 +2374,9 @@ function renderReporteChart(desde, hasta, activas) {
 // ---------- Exportar ----------
 function filasReporteParaExportar() {
     const { desde, hasta } = calcularRangoReporte();
-    const lista = ventas.filter(v => v.fecha >= desde && v.fecha <= hasta).sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id - b.id);
+    const lista = ventas
+        .filter(v => (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId) && v.fecha >= desde && v.fecha <= hasta)
+        .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id - b.id);
     return { desde, hasta, lista };
 }
 
@@ -2323,6 +2389,7 @@ function exportarReporteExcel() {
         'Fecha': formatDateLong(v.fecha),
         'Hora': formatHora(v.creadoEn),
         'Sucursal': v.sucursal,
+        'Vendedor': v.vendedor || 'Sin registrar',
         'Cliente': nombreClienteVenta(v),
         'Documento': v.clienteDocumento || '',
         'Forma de pago': v.formaPago,
@@ -2353,8 +2420,8 @@ function exportarReportePDF() {
 
     doc.autoTable({
         startY: 38,
-        head: [['Boleta', 'Fecha', 'Sucursal', 'Cliente', 'Forma de pago', 'Total', 'Estado']],
-        body: lista.map(v => [v.numBoleta, formatDate(v.fecha), v.sucursal, nombreClienteVenta(v), v.formaPago, formatPEN(ventaTotal(v)), ventaEstaAnulada(v) ? 'Anulada' : 'Activa']),
+        head: [['Boleta', 'Fecha', 'Sucursal', 'Vendedor', 'Cliente', 'Forma de pago', 'Total', 'Estado']],
+        body: lista.map(v => [v.numBoleta, formatDate(v.fecha), v.sucursal, v.vendedor || 'Sin registrar', nombreClienteVenta(v), v.formaPago, formatPEN(ventaTotal(v)), ventaEstaAnulada(v) ? 'Anulada' : 'Activa']),
         styles: { fontSize: 8 },
         headStyles: { fillColor: [16, 145, 224] }
     });
