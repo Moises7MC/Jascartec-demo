@@ -1810,7 +1810,7 @@ function construirTicketHTML(v) {
 
     return `
         <div class="ticket__center">
-            <img src="jascartec.ico" class="ticket__logo" alt="">
+            <img src="logocel.png" class="ticket__logo" alt="">
             <div class="ticket__marca">${negocio.razonSocial}</div>
             <div>${v.sucursal}</div>
             <div>${negocio.direccion}</div>
@@ -1883,7 +1883,7 @@ function renderBoleta(v) {
         <div class="boleta">
             <div class="boleta__top">
                 <div class="boleta__brand-row">
-                    <img src="jascartec.ico" class="boleta__logo" alt="Jascartec">
+                    <img src="logocel.png" class="boleta__logo" alt="Jascartec">
                     <div>
                         <div class="boleta__brand">Jascartec<sup>®</sup></div>
                         <div>${negocio.razonSocial}</div>
