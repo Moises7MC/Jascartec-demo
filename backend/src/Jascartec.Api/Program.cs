@@ -1,4 +1,5 @@
 using System.Text;
+using Jascartec.Api.BackgroundServices;
 using Jascartec.Api.Middleware;
 using Jascartec.Application;
 using Jascartec.Application.Common;
@@ -16,6 +17,7 @@ builder.Services.AddControllers();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<CajaAutoService>();
 
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
     ?? throw new InvalidOperationException("Falta la sección 'Jwt' en la configuración.");
