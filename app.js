@@ -1810,6 +1810,7 @@ function construirTicketHTML(v) {
 
     return `
         <div class="ticket__center">
+            <img src="jascartec.ico" class="ticket__logo" alt="">
             <div class="ticket__marca">${negocio.razonSocial}</div>
             <div>${v.sucursal}</div>
             <div>${negocio.direccion}</div>
@@ -1881,11 +1882,14 @@ function renderBoleta(v) {
     $('#boletaContent').innerHTML = `
         <div class="boleta">
             <div class="boleta__top">
-                <div>
-                    <div class="boleta__brand">Jascartec<sup>®</sup></div>
-                    <div>${negocio.razonSocial}</div>
-                    <div>${negocio.direccion}</div>
-                    <div>Tel: ${negocio.telefono} · ${negocio.email}</div>
+                <div class="boleta__brand-row">
+                    <img src="jascartec.ico" class="boleta__logo" alt="Jascartec">
+                    <div>
+                        <div class="boleta__brand">Jascartec<sup>®</sup></div>
+                        <div>${negocio.razonSocial}</div>
+                        <div>${negocio.direccion}</div>
+                        <div>Tel: ${negocio.telefono} · ${negocio.email}</div>
+                    </div>
                 </div>
                 <div class="boleta__doc">
                     <div>NOTA DE VENTA</div>
