@@ -2103,13 +2103,15 @@ function renderVentas() {
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.items.length}</td>
                 <td>${formatPEN(ventaTotal(v))}</td>
-                <td class="actions-cell">
-                    <button class="btn-small" onclick="verBoleta(${v.id})">Ver</button>
+                <td class="actions-icons">
+                    <button class="btn-icon-action btn-icon-action--historial" title="Ver boleta" onclick="verBoleta(${v.id})"><i class="ri-eye-line"></i></button>
                     ${anulada
                         ? '<span class="tag tag-red">Anulada</span>'
                         : `
-                            ${v.formaPago === 'Crédito' ? `<button class="btn-small${ventaEstaPagada(v) ? '' : '-danger'}" onclick="abrirGestionPago(${v.id})">${ventaEstaPagada(v) ? 'Pagado' : 'Gestionar pago'}</button>` : `<span class="tag ${tag}">${texto}</span>`}
-                            <button class="btn-small-danger" onclick="anularVenta(${v.id})">Anular</button>
+                            ${v.formaPago === 'Crédito'
+                                ? `<button class="btn-icon-action ${ventaEstaPagada(v) ? 'btn-icon-action--exito' : 'btn-icon-action--editar'}" title="${ventaEstaPagada(v) ? 'Pagado' : 'Gestionar pago'}" onclick="abrirGestionPago(${v.id})"><i class="${ventaEstaPagada(v) ? 'ri-checkbox-circle-line' : 'ri-wallet-3-line'}"></i></button>`
+                                : `<span class="tag ${tag}" title="${texto}">${texto}</span>`}
+                            <button class="btn-icon-action btn-icon-action--eliminar" title="Anular" onclick="anularVenta(${v.id})"><i class="ri-close-circle-line"></i></button>
                         `}
                 </td>
             </tr>

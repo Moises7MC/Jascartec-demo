@@ -496,6 +496,8 @@ img {
 .btn-icon-action--editar:hover { background: hsl(30, 80%, 40%); color: #fff; box-shadow: 0 4px 10px hsla(30, 80%, 40%, .35); }
 .btn-icon-action--eliminar { background: hsl(0, 79%, 95%); color: var(--error-color); }
 .btn-icon-action--eliminar:hover { background: var(--error-color); color: #fff; box-shadow: 0 4px 10px hsla(0, 79%, 55%, .35); }
+.btn-icon-action--exito { background: hsl(145, 63%, 94%); color: var(--success-color); }
+.btn-icon-action--exito:hover { background: var(--success-color); color: #fff; box-shadow: 0 4px 10px hsla(145, 63%, 40%, .35); }
 
 /*=============== TOOLBAR / FILTERS ===============*/
 .toolbar {
