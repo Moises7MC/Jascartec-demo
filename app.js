@@ -2331,54 +2331,39 @@ function renderCobrosPorFecha() {
 }
 $('#cobFecha').addEventListener('change', renderCobrosPorFecha);
 
-// Imprime la lista de cobros del día elegido en una ventana aparte (hoja normal, no el ticket
-// térmico de 80mm) — así no interfiere con la impresión de boletas.
+// Arma la lista de cobros del día como una tira vertical, reutilizando las mismas clases
+// .ticket__* (y el mismo <div id="ticketImprimible">) que ya usa el ticket de venta — así
+// sale por la ticketera térmica de 80mm sin necesitar ninguna configuración nueva.
+function construirListaCobrosHTML(fecha, items) {
+    const totalDia = items.reduce((s, { cuota: c }) => s + c.monto, 0);
+    const filasClientes = items.map(({ venta: v, cuota: c }) => `
+        <div class="ticket__item">
+            <span class="ticket__item-nombre">${nombreClienteVenta(v)}</span>
+            <div class="ticket__row"><span>Cel: ${v.clienteTelefono || '—'}</span><span>${v.numBoleta}</span></div>
+            <div class="ticket__row"><span>Cuota ${c.numero}</span><span>${formatPEN(c.monto)}</span></div>
+        </div>
+    `).join('<hr class="ticket__sep">');
+
+    return `
+        <div class="ticket__center">
+            <img src="logocel.png" class="ticket__logo" alt="">
+            <div class="ticket__marca">${negocio.razonSocial}</div>
+            <div>Cobros del ${formatDateLong(fecha)}</div>
+        </div>
+        <hr class="ticket__sep">
+        ${filasClientes}
+        <hr class="ticket__sep">
+        <div class="ticket__row ticket__total"><span>TOTAL (${items.length})</span><span>${formatPEN(totalDia)}</span></div>
+    `;
+}
+
 function imprimirCobrosDelDia() {
     const fecha = $('#cobFecha').value || today();
     const items = cuotasQueVencenEn(fecha);
     if (!items.length) { toast('✗ No hay cobros programados para esa fecha', 'error'); return; }
 
-    const totalDia = items.reduce((s, { cuota: c }) => s + c.monto, 0);
-    const filas = items.map(({ venta: v, cuota: c }) => `
-        <tr>
-            <td>${nombreClienteVenta(v)}</td>
-            <td>${v.clienteTelefono || '—'}</td>
-            <td>${v.numBoleta}</td>
-            <td>${c.numero}</td>
-            <td>${formatPEN(c.monto)}</td>
-        </tr>
-    `).join('');
-
-    const html = `
-        <html>
-        <head>
-            <title>Cobros del ${formatDateLong(fecha)}</title>
-            <style>
-                body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; }
-                h1 { font-size: 18px; margin-bottom: 4px; }
-                p { margin-top: 0; color: #555; }
-                table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-                th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; font-size: 13px; }
-                th { background: #f2f2f2; }
-            </style>
-        </head>
-        <body>
-            <h1>${negocio.razonSocial} — Cobros del ${formatDateLong(fecha)}</h1>
-            <p>${items.length} cliente(s) · Total a cobrar: ${formatPEN(totalDia)}</p>
-            <table>
-                <thead><tr><th>Cliente</th><th>Celular</th><th>Boleta</th><th>Cuota N°</th><th>Monto</th></tr></thead>
-                <tbody>${filas}</tbody>
-            </table>
-        </body>
-        </html>
-    `;
-
-    const ventana = window.open('', '_blank');
-    if (!ventana) { toast('✗ El navegador bloqueó la ventana de impresión — permite las ventanas emergentes para este sitio', 'error'); return; }
-    ventana.document.write(html);
-    ventana.document.close();
-    ventana.focus();
-    ventana.print();
+    $('#ticketImprimible').innerHTML = construirListaCobrosHTML(fecha, items);
+    window.print();
 }
 
 // ===================== REPORTES DE VENTAS =====================
