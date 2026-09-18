@@ -407,7 +407,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
 
         return new VentaDto(
             v.Id, v.NumBoleta, v.Fecha, v.ClienteId,
-            v.Cliente?.Nombre ?? "Cliente varios (sin registrar)", v.Cliente?.Documento, v.Cliente?.Direccion,
+            v.Cliente?.Nombre ?? "Cliente varios (sin registrar)", v.Cliente?.Documento, v.Cliente?.Direccion, v.Cliente?.Telefono,
             v.SucursalId, v.Sucursal.Nombre, v.UsuarioId, v.Usuario?.Nombre,
             v.FormaPago == FormaPago.Credito ? "Crédito" : "Contado", v.MedioPago?.ToString(), v.FechaPagoAcordada,
             items, abonos, v.Total, v.MontoPagado, v.SaldoPendiente,
