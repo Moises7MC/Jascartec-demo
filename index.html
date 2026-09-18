@@ -127,9 +127,6 @@
                     <a href="#" class="nav-item" data-view="facturas" data-roles="Administrador">
                         <i class='bx bx-file'></i> Facturas
                     </a>
-                    <a href="#" class="nav-item" data-view="clientes" data-roles="Administrador,Vendedor">
-                        <i class='bx bx-group'></i> Clientes
-                    </a>
                     <a href="#" class="nav-item" data-view="marcas" data-roles="Administrador">
                         <i class='bx bx-purchase-tag'></i> Marcas
                     </a>
@@ -281,7 +278,10 @@
                     </div>
 
                     <div class="tabs">
-                        <button type="button" class="tab-btn active" data-cob-tab="activos" onclick="cambiarTabCobranzas('activos')">
+                        <button type="button" class="tab-btn active" data-cob-tab="clientes" onclick="cambiarTabCobranzas('clientes')">
+                            <i class='bx bx-group'></i> Clientes
+                        </button>
+                        <button type="button" class="tab-btn" data-cob-tab="activos" onclick="cambiarTabCobranzas('activos')">
                             <i class='bx bx-list-check'></i> Créditos activos
                         </button>
                         <button type="button" class="tab-btn" data-cob-tab="fecha" onclick="cambiarTabCobranzas('fecha')">
@@ -289,7 +289,66 @@
                         </button>
                     </div>
 
-                    <div class="cob-tab-panel" id="cobTabActivos">
+                    <div class="cob-tab-panel" id="cobTabClientes">
+                        <div class="view__header">
+                            <div>
+                                <h3 class="section-subtitle">Tu cartera de clientes</h3>
+                                <p class="muted">Revisa su historial crediticio antes de aprobar una nueva venta a crédito</p>
+                            </div>
+                            <button class="btn btn--primary" onclick="openModal('modalCliente')">
+                                <i class='bx bx-plus'></i> Nuevo Cliente
+                            </button>
+                        </div>
+                        <div class="toolbar">
+                            <div class="toolbar__search">
+                                <i class='bx bx-search'></i>
+                                <input type="text" id="cliSearch" placeholder="Buscar por nombre, apellido o DNI/RUC...">
+                            </div>
+                            <select id="cliFiltroEstado">
+                                <option value="">Todos los estados</option>
+                                <option value="al-dia">🟢 Al día</option>
+                                <option value="atraso">🟡 Atrasos leves</option>
+                                <option value="moroso">🔴 Moroso</option>
+                                <option value="sin-historial">⚪ Sin historial</option>
+                            </select>
+                            <select id="cliFiltroEstrellas">
+                                <option value="">Todas las calificaciones</option>
+                                <option value="5">★★★★★ (5)</option>
+                                <option value="4">★★★★☆ (4)</option>
+                                <option value="3">★★★☆☆ (3)</option>
+                                <option value="2">★★☆☆☆ (2)</option>
+                                <option value="1">★☆☆☆☆ (1)</option>
+                            </select>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="table table--clientes">
+                                <colgroup>
+                                    <col style="width:23%">
+                                    <col style="width:10%">
+                                    <col style="width:20%">
+                                    <col style="width:12%">
+                                    <col style="width:9%">
+                                    <col style="width:10%">
+                                    <col style="width:16%">
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th>Documento</th>
+                                        <th>Contacto</th>
+                                        <th>Calificación</th>
+                                        <th>Estado</th>
+                                        <th>Deuda</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="clientesBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="clientesPaginacion"></div>
+                    </div>
+
+                    <div class="cob-tab-panel" id="cobTabActivos" style="display:none;">
                         <div class="toolbar">
                             <div class="toolbar__search">
                                 <i class='bx bx-search'></i>
@@ -787,66 +846,6 @@
                         </button>
                     </div>
                     <div class="cards-grid" id="facturasGrid"></div>
-                </section>
-
-                <!-- ============== VIEW: CLIENTES ============== -->
-                <section class="view" id="view-clientes">
-                    <div class="view__header">
-                        <div>
-                            <h2>Tu cartera de clientes</h2>
-                            <p>Revisa su historial crediticio antes de aprobar una nueva venta a crédito</p>
-                        </div>
-                        <button class="btn btn--primary" onclick="openModal('modalCliente')">
-                            <i class='bx bx-plus'></i> Nuevo Cliente
-                        </button>
-                    </div>
-                    <div class="toolbar">
-                        <div class="toolbar__search">
-                            <i class='bx bx-search'></i>
-                            <input type="text" id="cliSearch" placeholder="Buscar por nombre, apellido o DNI/RUC...">
-                        </div>
-                        <select id="cliFiltroEstado">
-                            <option value="">Todos los estados</option>
-                            <option value="al-dia">🟢 Al día</option>
-                            <option value="atraso">🟡 Atrasos leves</option>
-                            <option value="moroso">🔴 Moroso</option>
-                            <option value="sin-historial">⚪ Sin historial</option>
-                        </select>
-                        <select id="cliFiltroEstrellas">
-                            <option value="">Todas las calificaciones</option>
-                            <option value="5">★★★★★ (5)</option>
-                            <option value="4">★★★★☆ (4)</option>
-                            <option value="3">★★★☆☆ (3)</option>
-                            <option value="2">★★☆☆☆ (2)</option>
-                            <option value="1">★☆☆☆☆ (1)</option>
-                        </select>
-                    </div>
-                    <div class="table-wrap">
-                        <table class="table table--clientes">
-                            <colgroup>
-                                <col style="width:23%">
-                                <col style="width:10%">
-                                <col style="width:20%">
-                                <col style="width:12%">
-                                <col style="width:9%">
-                                <col style="width:10%">
-                                <col style="width:16%">
-                            </colgroup>
-                            <thead>
-                                <tr>
-                                    <th>Cliente</th>
-                                    <th>Documento</th>
-                                    <th>Contacto</th>
-                                    <th>Calificación</th>
-                                    <th>Estado</th>
-                                    <th>Deuda</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="clientesBody"></tbody>
-                        </table>
-                    </div>
-                    <div class="pagination" id="clientesPaginacion"></div>
                 </section>
 
                 <!-- ============== VIEW: MARCAS ============== -->

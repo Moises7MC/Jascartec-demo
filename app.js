@@ -409,7 +409,6 @@ const pageTitles = {
     productos: { title: 'Productos', subtitle: 'Catálogo completo de modelos' },
     proveedores: { title: 'Proveedores', subtitle: 'Aliados que abastecen tu negocio' },
     facturas: { title: 'Facturas', subtitle: 'Cuentas por pagar a tus proveedores' },
-    clientes: { title: 'Clientes', subtitle: 'Tu cartera de compradores' },
     marcas: { title: 'Marcas', subtitle: 'Marcas disponibles para tus modelos' },
     categorias: { title: 'Categorías', subtitle: 'Tipos de producto que maneja tu negocio' },
     usuarios: { title: 'Usuarios', subtitle: 'Administra quién tiene acceso al sistema' },
@@ -442,7 +441,6 @@ function renderView(view) {
         productos: renderProductos,
         proveedores: renderProveedores,
         facturas: renderFacturas,
-        clientes: renderClientes,
         marcas: renderMarcas,
         categorias: renderCategorias,
         usuarios: renderUsuarios
@@ -2245,13 +2243,16 @@ const proximaCuotaPendiente = (v) => (v.cuotas || []).find(c => !c.pagada) || nu
 
 function cambiarTabCobranzas(tab) {
     $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.cobTab === tab));
+    $('#cobTabClientes').style.display = tab === 'clientes' ? '' : 'none';
     $('#cobTabActivos').style.display = tab === 'activos' ? '' : 'none';
     $('#cobTabFecha').style.display = tab === 'fecha' ? '' : 'none';
-    if (tab === 'activos') renderCobranzasActivos();
+    if (tab === 'clientes') renderClientes();
+    else if (tab === 'activos') renderCobranzasActivos();
     else renderCobrosPorFecha();
 }
 
 function renderVistaCobranzas() {
+    renderClientes();
     renderCobranzasActivos();
     renderCobrosPorFecha();
 }
