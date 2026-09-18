@@ -1911,9 +1911,22 @@ function construirTicketHTML(v) {
     `;
 }
 
+// Antes de imprimir, espera a que el logo termine de cargar — en la nube la imagen viene de
+// otro servidor y el navegador a veces manda a imprimir antes de que llegue, dejando un
+// espacio en blanco donde debería estar el logo (en local, al cargar tan rápido, no se nota).
+function imprimirTicketImprimible() {
+    const img = $('#ticketImprimible img.ticket__logo');
+    if (img && !img.complete) {
+        img.addEventListener('load', () => window.print(), { once: true });
+        img.addEventListener('error', () => window.print(), { once: true });
+    } else {
+        window.print();
+    }
+}
+
 function imprimirTicket(v) {
     $('#ticketImprimible').innerHTML = construirTicketHTML(v);
-    window.print();
+    imprimirTicketImprimible();
 }
 
 function imprimirTicketBoleta() {
@@ -2369,7 +2382,7 @@ function imprimirCobrosDelDia() {
     if (!items.length) { toast('✗ No hay cobros programados para esa fecha', 'error'); return; }
 
     $('#ticketImprimible').innerHTML = construirListaCobrosHTML(fecha, items);
-    window.print();
+    imprimirTicketImprimible();
 }
 
 // ===================== REPORTES DE VENTAS =====================
