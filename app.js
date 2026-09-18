@@ -2292,6 +2292,8 @@ function renderCobranzasActivos() {
             <tr>
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.clienteTelefono || '—'}</td>
+                <td>${v.sucursal}</td>
+                <td>${v.vendedor || '—'}</td>
                 <td>${formatPEN(montoTotal)}</td>
                 <td>${formatPEN(cuotaMonto)}</td>
                 <td>${v.numCuotas ?? '—'}</td>
@@ -2303,7 +2305,7 @@ function renderCobranzasActivos() {
                 </td>
             </tr>
         `;
-    }).join('') : '<tr><td colspan="9" class="empty-state">No hay créditos activos con esos filtros</td></tr>';
+    }).join('') : '<tr><td colspan="11" class="empty-state">No hay créditos activos con esos filtros</td></tr>';
 }
 $('#cobSearch').addEventListener('input', renderCobranzasActivos);
 $('#cobFiltroEstado').addEventListener('change', renderCobranzasActivos);
@@ -2320,6 +2322,8 @@ function renderCobrosPorFecha() {
         <tr>
             <td>${nombreClienteVenta(v)}</td>
             <td>${v.clienteTelefono || '—'}</td>
+            <td>${v.sucursal}</td>
+            <td>${v.vendedor || '—'}</td>
             <td>${v.numBoleta}</td>
             <td>${c.numero}</td>
             <td>${formatPEN(c.monto)}</td>
@@ -2327,7 +2331,7 @@ function renderCobrosPorFecha() {
                 <button class="btn-icon-action btn-icon-action--historial" title="Gestionar pago" onclick="abrirGestionPago(${v.id})"><i class="ri-wallet-3-line"></i></button>
             </td>
         </tr>
-    `).join('') : '<tr><td colspan="6" class="empty-state">No hay cobros programados para esta fecha</td></tr>';
+    `).join('') : '<tr><td colspan="8" class="empty-state">No hay cobros programados para esta fecha</td></tr>';
 }
 $('#cobFecha').addEventListener('change', renderCobrosPorFecha);
 
@@ -2340,6 +2344,7 @@ function construirListaCobrosHTML(fecha, items) {
         <div class="ticket__item">
             <span class="ticket__item-nombre">${nombreClienteVenta(v)}</span>
             <div class="ticket__row"><span>Cel: ${v.clienteTelefono || '—'}</span><span>${v.numBoleta}</span></div>
+            <div class="ticket__row"><span>${v.sucursal}</span><span>${v.vendedor || 'Sin registrar'}</span></div>
             <div class="ticket__row"><span>Cuota ${c.numero}</span><span>${formatPEN(c.monto)}</span></div>
         </div>
     `).join('<hr class="ticket__sep">');
