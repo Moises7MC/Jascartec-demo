@@ -99,6 +99,9 @@
                     <a href="#" class="nav-item active" data-view="dashboard" data-roles="Administrador,Vendedor">
                         <i class='bx bx-grid-alt'></i> Dashboard
                     </a>
+                    <a href="#" class="nav-item" data-view="cobranzas" data-roles="Administrador,Vendedor">
+                        <img src="cobrar.png" class="nav-item__icon-img" alt=""> Cuentas por Cobrar
+                    </a>
                     <a href="#" class="nav-item" data-view="inventario" data-roles="Administrador,Vendedor">
                         <i class='bx bx-mobile'></i> Inventario
                     </a>
@@ -246,6 +249,98 @@
                             <h3>Modelos más vendidos</h3>
                         </div>
                         <canvas id="chartTopProductos" height="90"></canvas>
+                    </div>
+                </section>
+
+                <!-- ============== VIEW: CUENTAS POR COBRAR ============== -->
+                <section class="view" id="view-cobranzas">
+                    <div class="view__header">
+                        <div>
+                            <h2>Cuentas por Cobrar</h2>
+                            <p>Créditos activos y cobros pendientes de tus clientes</p>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid stats-grid--compact">
+                        <div class="stat-card">
+                            <span class="stat-card__label">Total por cobrar</span>
+                            <span class="stat-card__value" id="cobTotalPorCobrar">S/ 0.00</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-card__label">Clientes con crédito activo</span>
+                            <span class="stat-card__value" id="cobClientesActivos">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-card__label">Con cuotas vencidas</span>
+                            <span class="stat-card__value stat-card__value--red" id="cobMorosos">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-card__label">Cobros de hoy</span>
+                            <span class="stat-card__value" id="cobHoyCantidad">0</span>
+                        </div>
+                    </div>
+
+                    <div class="tabs">
+                        <button type="button" class="tab-btn active" data-cob-tab="activos" onclick="cambiarTabCobranzas('activos')">
+                            <i class='bx bx-list-check'></i> Créditos activos
+                        </button>
+                        <button type="button" class="tab-btn" data-cob-tab="fecha" onclick="cambiarTabCobranzas('fecha')">
+                            <i class='bx bx-calendar'></i> Cobros por fecha
+                        </button>
+                    </div>
+
+                    <div class="cob-tab-panel" id="cobTabActivos">
+                        <div class="toolbar">
+                            <div class="toolbar__search">
+                                <i class='bx bx-search'></i>
+                                <input type="text" id="cobSearch" placeholder="Buscar por nombre o documento del cliente...">
+                            </div>
+                            <select id="cobFiltroEstado">
+                                <option value="todos">Todos</option>
+                                <option value="vencidos">Con cuotas vencidas</option>
+                                <option value="aldia">Al día</option>
+                            </select>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th>Celular</th>
+                                        <th>Monto</th>
+                                        <th>Cuota</th>
+                                        <th>N° cuotas</th>
+                                        <th>Pagadas</th>
+                                        <th>Próx. pago</th>
+                                        <th>Días de atraso</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cobActivosBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="cob-tab-panel" id="cobTabFecha" style="display:none;">
+                        <div class="toolbar">
+                            <label class="cob-fecha-label">Ver cobros del día <input type="date" id="cobFecha"></label>
+                            <button type="button" class="btn-small-outline" onclick="imprimirCobrosDelDia()"><i class='bx bx-printer'></i> Imprimir lista</button>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th>Celular</th>
+                                        <th>Boleta</th>
+                                        <th>Cuota N°</th>
+                                        <th>Monto</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cobFechaBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 

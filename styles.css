@@ -335,6 +335,12 @@ img {
 .nav-item:hover { background: hsla(0, 0%, 100%, .06); color: #fff; }
 .nav-item.active { background: var(--first-color); color: #fff; }
 
+/* cobrar.png es un ícono negro normal (no una fuente de íconos como boxicons), así que se
+   invierte a blanco y se le baja la opacidad para que se vea igual de "apagado" que el resto
+   del menú hasta que el mouse pasa por encima o queda activo. */
+.nav-item__icon-img { width: 1.15rem; height: 1.15rem; object-fit: contain; filter: invert(1); opacity: .65; transition: opacity .2s; }
+.nav-item:hover .nav-item__icon-img, .nav-item.active .nav-item__icon-img { opacity: 1; }
+
 .sidebar__user {
   display: flex;
   align-items: center;
@@ -1082,6 +1088,12 @@ img {
   gap: .85rem;
 }
 .credito-preview__vacio { font-size: var(--small-font-size); color: var(--text-color-light); text-align: center; padding: .5rem 0; }
+
+/* Aviso de renovación de crédito, dentro de Registrar Venta — mismo espejo que la regla que
+   valida el backend, para que el vendedor lo sepa ANTES de intentar confirmar la venta. */
+.renovacion-aviso { border-radius: .6rem; padding: .6rem .85rem; font-size: var(--small-font-size); margin-top: .6rem; }
+.renovacion-aviso--bloqueado { background: hsl(0, 79%, 95%); color: var(--error-color); }
+.renovacion-aviso--info { background: hsl(199, 92%, 93%); color: hsl(199, 89%, 30%); }
 .credito-preview__resumen {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

@@ -401,6 +401,7 @@ function toggleSidebar() {
 // ===================== NAVEGACIÓN =====================
 const pageTitles = {
     dashboard: { title: 'Dashboard', subtitle: 'Resumen general de tu negocio' },
+    cobranzas: { title: 'Cuentas por Cobrar', subtitle: 'Créditos activos y cobros pendientes de tus clientes' },
     inventario: { title: 'Inventario', subtitle: 'Controla el stock de todos tus productos' },
     ingresos: { title: 'Ingresos', subtitle: 'Registro de compras y productos recibidos' },
     ventas: { title: 'Ventas', subtitle: 'Registra y da seguimiento a tu actividad comercial' },
@@ -433,6 +434,7 @@ $$('.nav-item').forEach(item => {
 function renderView(view) {
     const renderers = {
         dashboard: renderDashboard,
+        cobranzas: renderVistaCobranzas,
         inventario: renderInventario,
         ingresos: renderIngresos,
         ventas: renderVentas,
@@ -453,6 +455,7 @@ function renderAll() {
     populateSelectCategorias();
     populateFiltroProveedorIngresos();
     renderDashboard();
+    renderVistaCobranzas();
     renderInventario();
     renderIngresos();
     renderVentas();
@@ -1471,6 +1474,26 @@ function actualizarVisibilidadMedioPago() {
     $('#venMedioPagoWrap').style.display = requiereMedioPago ? '' : 'none';
 }
 
+// Espejo (en el navegador) de la misma regla que ya valida el backend en
+// VentaService.CrearAsync — avisa al vendedor ANTES de intentar confirmar la venta, pero
+// quien de verdad decide es siempre el servidor (esto es solo para no hacerle perder tiempo
+// armando un carrito que después le va a rechazar).
+function evaluarRenovacionCredito(clienteId) {
+    const activos = ventas.filter(v =>
+        v.clienteId === clienteId && v.formaPago === 'Crédito' && !ventaEstaAnulada(v) && ventaSaldoPendiente(v) > 0.01);
+    if (!activos.length) return { estado: 'sin-credito' };
+
+    for (const v of activos) {
+        const pendientes = (v.cuotas || []).filter(c => !c.pagada).length;
+        if (pendientes > 1) return { estado: 'bloqueado', boleta: v.numBoleta, pendientes };
+    }
+    return {
+        estado: 'renovable',
+        saldoAbsorber: activos.reduce((s, v) => s + ventaSaldoPendiente(v), 0),
+        boletas: activos.map(v => v.numBoleta).join(', ')
+    };
+}
+
 // Muestra el historial crediticio del cliente elegido apenas la venta es a crédito — el
 // vendedor lo ve en el momento exacto en que tiene que decidir si aprobarle o no un crédito.
 function actualizarHistorialClienteVenta() {
@@ -1487,8 +1510,7 @@ function actualizarHistorialClienteVenta() {
     const clienteId = parseInt(clienteIdRaw);
     const c = findCliente(clienteId);
     const hist = calcularHistorialCrediticio(clienteId);
-    wrap.style.display = '';
-    wrap.innerHTML = !hist.tieneHistorial
+    const historialHtml = !hist.tieneHistorial
         ? `<div class="historial-compacto historial-compacto--sin-historial">${renderEstrellas(null)}<span class="badge-estado badge-estado--sin-historial">${hist.estadoTexto}</span><span class="historial-compacto__recomendacion">${c.nombre} todavía no tiene historial de créditos.</span></div>`
         : `<div class="historial-compacto historial-compacto--${hist.estado}">
                 ${renderEstrellas(hist.estrellas)}
@@ -1497,6 +1519,16 @@ function actualizarHistorialClienteVenta() {
                 <span class="historial-compacto__recomendacion">${hist.recomendacion}</span>
                 <button type="button" class="btn-small-outline" onclick="abrirHistorialCrediticio(${clienteId})">Ver historial completo</button>
            </div>`;
+
+    const renov = evaluarRenovacionCredito(clienteId);
+    const renovHtml = renov.estado === 'bloqueado'
+        ? `<div class="renovacion-aviso renovacion-aviso--bloqueado">⚠️ Todavía tiene el crédito <strong>${renov.boleta}</strong> con ${renov.pendientes} cuotas pendientes — no puede sacar un crédito nuevo hasta que le falte pagar solo la última cuota de ese.</div>`
+        : renov.estado === 'renovable'
+            ? `<div class="renovacion-aviso renovacion-aviso--info">ℹ️ A este cliente le falta pagar solo la última cuota de <strong>${renov.boletas}</strong> — si confirmas este crédito, se le van a sumar automáticamente <strong>${formatPEN(renov.saldoAbsorber)}</strong> pendientes de ese crédito anterior (que quedará saldado).</div>`
+            : '';
+
+    wrap.style.display = '';
+    wrap.innerHTML = historialHtml + renovHtml;
 }
 
 function actualizarNumCuotasOptions() {
@@ -1826,6 +1858,7 @@ let ventaBoletaActual = null;
 function construirTicketHTML(v) {
     const total = ventaTotal(v);
     const recargo = v.recargo || 0;
+    const saldoAbsorbido = v.saldoAbsorbido || 0;
     const esCredito = v.formaPago === 'Crédito';
 
     const filasItems = v.items.map(it => `
@@ -1858,8 +1891,9 @@ function construirTicketHTML(v) {
         <hr class="ticket__sep">
         ${filasItems}
         <hr class="ticket__sep">
-        <div class="ticket__row ticket__total"><span>TOTAL</span><span>${formatPEN(total + recargo)}</span></div>
+        <div class="ticket__row ticket__total"><span>TOTAL</span><span>${formatPEN(total + recargo + saldoAbsorbido)}</span></div>
         ${esCredito ? `
+            ${saldoAbsorbido > 0 ? `<div class="ticket__row"><span>Incluye crédito anterior:</span><span>${formatPEN(saldoAbsorbido)}</span></div>` : ''}
             <div class="ticket__row"><span>Inicial pagado:</span><span>${formatPEN(v.montoInicial || 0)}</span></div>
             <div class="ticket__row"><span>Saldo pendiente:</span><span>${formatPEN(ventaSaldoPendiente(v))}</span></div>
             <hr class="ticket__sep">
@@ -1893,6 +1927,7 @@ function renderBoleta(v) {
     const total = ventaTotal(v);
     const igv = total - total / 1.18;
     const recargo = v.recargo || 0;
+    const saldoAbsorbido = v.saldoAbsorbido || 0;
     const esCredito = v.formaPago === 'Crédito';
 
     // A crédito, el cliente necesita ver el cronograma completo acá mismo — la fecha y el
@@ -1901,7 +1936,8 @@ function renderBoleta(v) {
         <div class="detalle-grid" style="margin-top:1rem;">
             <div><div class="label">Monto inicial</div><div class="value">${formatPEN(v.montoInicial || 0)}</div></div>
             <div><div class="label">Recargo por crédito</div><div class="value">${formatPEN(recargo)}</div></div>
-            <div><div class="label">Total a pagar</div><div class="value">${formatPEN(total + recargo)}</div></div>
+            ${saldoAbsorbido > 0 ? `<div><div class="label">Incluye crédito anterior</div><div class="value">${formatPEN(saldoAbsorbido)}</div></div>` : ''}
+            <div><div class="label">Total a pagar</div><div class="value">${formatPEN(total + recargo + saldoAbsorbido)}</div></div>
             <div><div class="label">Saldo pendiente</div><div class="value">${formatPEN(ventaSaldoPendiente(v))}</div></div>
         </div>
         <h4 class="section-subtitle" style="margin-top:1rem;">Cronograma de pagos${v.frecuenciaPago ? ` (${v.frecuenciaPago.toLowerCase()})` : ''}</h4>
@@ -1966,6 +2002,7 @@ function abrirGestionPago(ventaId) {
     if (!v) return;
     const total = ventaTotal(v);
     const recargo = v.recargo || 0;
+    const saldoAbsorbido = v.saldoAbsorbido || 0;
     const pagado = ventaMontoPagado(v);
     const saldo = ventaSaldoPendiente(v);
     const { tag, texto } = tagFormaPago(v);
@@ -1973,7 +2010,7 @@ function abrirGestionPago(ventaId) {
     const abonosHtml = (v.abonos || []).length
         ? v.abonos.map(a => `
             <div class="list-item">
-                <div><div class="list-item__name">Abono · ${a.medioPago}</div><div class="list-item__meta">${formatDateLong(a.fecha)}</div></div>
+                <div><div class="list-item__name">${a.medioPago === 'Renovacion' ? `Renovación de crédito${a.concepto ? ' · ' + a.concepto : ''}` : `Abono · ${a.medioPago}`}</div><div class="list-item__meta">${formatDateLong(a.fecha)}</div></div>
                 <span class="tag tag-green">${formatPEN(a.monto)}</span>
             </div>`).join('')
         : '<div class="empty-state">Aún no ha registrado abonos</div>';
@@ -2003,12 +2040,14 @@ function abrirGestionPago(ventaId) {
             <div><div class="label">Fecha de venta</div><div class="value">${formatDateLong(v.fecha)}</div></div>
             <div><div class="label">Total equipo</div><div class="value">${formatPEN(total)}</div></div>
             ${recargo > 0 ? `<div><div class="label">Recargo por crédito</div><div class="value">${formatPEN(recargo)}</div></div>` : ''}
-            <div><div class="label">Total a pagar</div><div class="value">${formatPEN(total + recargo)}</div></div>
+            ${saldoAbsorbido > 0 ? `<div><div class="label">Incluye crédito anterior</div><div class="value">${formatPEN(saldoAbsorbido)}</div></div>` : ''}
+            <div><div class="label">Total a pagar</div><div class="value">${formatPEN(total + recargo + saldoAbsorbido)}</div></div>
             <div><div class="label">Última cuota</div><div class="value">${formatDateLong(v.fechaPagoAcordada)}</div></div>
             <div><div class="label">Pagado</div><div class="value">${formatPEN(pagado)}</div></div>
             <div><div class="label">Saldo pendiente</div><div class="value">${formatPEN(saldo)}</div></div>
         </div>
         <span class="tag ${tag}" style="margin:0.85rem 0; display:inline-block;">${texto}</span>
+        ${saldoAbsorbido > 0 ? `<div class="renovacion-aviso renovacion-aviso--info">Este crédito renovó ${v.ventaRenovadaId ? 'un crédito anterior' : ''} — incluye ${formatPEN(saldoAbsorbido)} que quedaba pendiente de esa venta.</div>` : ''}
         ${cronogramaHtml}
         <h4 class="section-subtitle">Historial de abonos</h4>
         <div class="list-modal" style="margin-bottom:1.25rem;">${abonosHtml}</div>
@@ -2172,7 +2211,7 @@ function renderCreditos() {
     }
 
     $('#creditosBody').innerHTML = lista.map(v => {
-        const totalAPagar = ventaTotal(v) + (v.recargo || 0);
+        const totalAPagar = ventaTotal(v) + (v.recargo || 0) + (v.saldoAbsorbido || 0);
         const pagado = ventaMontoPagado(v);
         const saldo = ventaSaldoPendiente(v);
         const { tag, texto } = tagFormaPago(v);
@@ -2197,6 +2236,150 @@ function renderCreditos() {
     }).join('');
 }
 $('#credSearch').addEventListener('input', renderCreditos);
+
+// ===================== CUENTAS POR COBRAR =====================
+// La primera cuota todavía sin pagar de una venta a crédito (o null si ya la pagó toda) —
+// es "lo próximo que le toca pagar" al cliente, la fecha que importa para saber si está
+// atrasado o al día.
+const proximaCuotaPendiente = (v) => (v.cuotas || []).find(c => !c.pagada) || null;
+
+function cambiarTabCobranzas(tab) {
+    $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.cobTab === tab));
+    $('#cobTabActivos').style.display = tab === 'activos' ? '' : 'none';
+    $('#cobTabFecha').style.display = tab === 'fecha' ? '' : 'none';
+    if (tab === 'activos') renderCobranzasActivos();
+    else renderCobrosPorFecha();
+}
+
+function renderVistaCobranzas() {
+    renderCobranzasActivos();
+    renderCobrosPorFecha();
+}
+
+// Tarjetas de resumen + tabla tipo "cronograma de banco": una fila por cada venta a crédito
+// que el cliente todavía no terminó de pagar, con cuánto debe, cuánto le toca por cuota, y
+// si está atrasado — mismo criterio de sucursal que el resto del sistema.
+function renderCobranzasActivos() {
+    const creditos = ventasActivasEnContexto().filter(v => v.formaPago === 'Crédito' && !ventaEstaPagada(v));
+
+    $('#cobTotalPorCobrar').textContent = formatPEN(creditos.reduce((s, v) => s + ventaSaldoPendiente(v), 0));
+    $('#cobClientesActivos').textContent = new Set(creditos.map(v => v.clienteId)).size;
+
+    const estaAtrasado = (v) => {
+        const prox = proximaCuotaPendiente(v);
+        return !!prox && diasParaVencer(prox.fechaVencimiento) < 0;
+    };
+    $('#cobMorosos').textContent = creditos.filter(estaAtrasado).length;
+    $('#cobHoyCantidad').textContent = cuotasQueVencenEn(today()).length;
+
+    const busqueda = ($('#cobSearch').value || '').trim().toLowerCase();
+    const filtro = $('#cobFiltroEstado').value;
+    let lista = [...creditos];
+    if (filtro === 'vencidos') lista = lista.filter(estaAtrasado);
+    else if (filtro === 'aldia') lista = lista.filter(v => !estaAtrasado(v));
+    if (busqueda) {
+        lista = lista.filter(v => `${nombreClienteVenta(v)} ${v.clienteDocumento || ''}`.toLowerCase().includes(busqueda));
+    }
+    lista.sort((a, b) => ventaSaldoPendiente(b) - ventaSaldoPendiente(a));
+
+    $('#cobActivosBody').innerHTML = lista.length ? lista.map(v => {
+        const prox = proximaCuotaPendiente(v);
+        const diasAtraso = prox ? Math.max(0, -diasParaVencer(prox.fechaVencimiento)) : 0;
+        const montoTotal = v.total + (v.recargo || 0) + (v.saldoAbsorbido || 0);
+        const cuotaMonto = (v.cuotas || [])[0]?.monto ?? 0;
+        const cuotasPagadas = (v.cuotas || []).filter(c => c.pagada).length;
+        return `
+            <tr>
+                <td>${nombreClienteVenta(v)}</td>
+                <td>${v.clienteTelefono || '—'}</td>
+                <td>${formatPEN(montoTotal)}</td>
+                <td>${formatPEN(cuotaMonto)}</td>
+                <td>${v.numCuotas ?? '—'}</td>
+                <td>${cuotasPagadas} / ${v.numCuotas ?? 0}</td>
+                <td>${prox ? formatDate(prox.fechaVencimiento) : '—'}</td>
+                <td>${diasAtraso > 0 ? `<span class="tag tag-red">${diasAtraso} día${diasAtraso === 1 ? '' : 's'}</span>` : '<span class="tag tag-green">Al día</span>'}</td>
+                <td class="actions-icons">
+                    <button class="btn-icon-action btn-icon-action--historial" title="Ver cronograma / gestionar pago" onclick="abrirGestionPago(${v.id})"><i class="ri-calendar-check-line"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('') : '<tr><td colspan="9" class="empty-state">No hay créditos activos con esos filtros</td></tr>';
+}
+$('#cobSearch').addEventListener('input', renderCobranzasActivos);
+$('#cobFiltroEstado').addEventListener('change', renderCobranzasActivos);
+
+// Todos los clientes a los que les toca pagar una cuota en una fecha puntual — reutiliza
+// cuotasQueVencenEn() (la misma que usa el Dashboard para "Cuotas a pagar hoy"), solo que acá
+// se puede elegir cualquier día, no solo hoy.
+function renderCobrosPorFecha() {
+    if (!$('#cobFecha').value) $('#cobFecha').value = today();
+    const fecha = $('#cobFecha').value;
+    const items = cuotasQueVencenEn(fecha);
+
+    $('#cobFechaBody').innerHTML = items.length ? items.map(({ venta: v, cuota: c }) => `
+        <tr>
+            <td>${nombreClienteVenta(v)}</td>
+            <td>${v.clienteTelefono || '—'}</td>
+            <td>${v.numBoleta}</td>
+            <td>${c.numero}</td>
+            <td>${formatPEN(c.monto)}</td>
+            <td class="actions-icons">
+                <button class="btn-icon-action btn-icon-action--historial" title="Gestionar pago" onclick="abrirGestionPago(${v.id})"><i class="ri-wallet-3-line"></i></button>
+            </td>
+        </tr>
+    `).join('') : '<tr><td colspan="6" class="empty-state">No hay cobros programados para esta fecha</td></tr>';
+}
+$('#cobFecha').addEventListener('change', renderCobrosPorFecha);
+
+// Imprime la lista de cobros del día elegido en una ventana aparte (hoja normal, no el ticket
+// térmico de 80mm) — así no interfiere con la impresión de boletas.
+function imprimirCobrosDelDia() {
+    const fecha = $('#cobFecha').value || today();
+    const items = cuotasQueVencenEn(fecha);
+    if (!items.length) { toast('✗ No hay cobros programados para esa fecha', 'error'); return; }
+
+    const totalDia = items.reduce((s, { cuota: c }) => s + c.monto, 0);
+    const filas = items.map(({ venta: v, cuota: c }) => `
+        <tr>
+            <td>${nombreClienteVenta(v)}</td>
+            <td>${v.clienteTelefono || '—'}</td>
+            <td>${v.numBoleta}</td>
+            <td>${c.numero}</td>
+            <td>${formatPEN(c.monto)}</td>
+        </tr>
+    `).join('');
+
+    const html = `
+        <html>
+        <head>
+            <title>Cobros del ${formatDateLong(fecha)}</title>
+            <style>
+                body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; }
+                h1 { font-size: 18px; margin-bottom: 4px; }
+                p { margin-top: 0; color: #555; }
+                table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+                th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; font-size: 13px; }
+                th { background: #f2f2f2; }
+            </style>
+        </head>
+        <body>
+            <h1>${negocio.razonSocial} — Cobros del ${formatDateLong(fecha)}</h1>
+            <p>${items.length} cliente(s) · Total a cobrar: ${formatPEN(totalDia)}</p>
+            <table>
+                <thead><tr><th>Cliente</th><th>Celular</th><th>Boleta</th><th>Cuota N°</th><th>Monto</th></tr></thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </body>
+        </html>
+    `;
+
+    const ventana = window.open('', '_blank');
+    if (!ventana) { toast('✗ El navegador bloqueó la ventana de impresión — permite las ventanas emergentes para este sitio', 'error'); return; }
+    ventana.document.write(html);
+    ventana.document.close();
+    ventana.focus();
+    ventana.print();
+}
 
 // ===================== REPORTES DE VENTAS =====================
 let repFechaAncla = today(); // fecha "eje" para diario/semanal/quincenal/mensual
@@ -3024,7 +3207,7 @@ function tablaComprasCliente(hist) {
                 <td><strong>${v.numBoleta}</strong></td>
                 <td>${formatDate(v.fecha)}</td>
                 <td>${v.formaPago}</td>
-                <td>${formatPEN(ventaTotal(v) + (v.recargo || 0))}</td>
+                <td>${formatPEN(ventaTotal(v) + (v.recargo || 0) + (v.saldoAbsorbido || 0))}</td>
                 <td>${anulada ? '<span class="tag tag-red">Anulada</span>' : `<span class="tag ${tag}">${texto}</span>`}</td>
                 <td class="actions-cell">${accion}</td>
             </tr>
