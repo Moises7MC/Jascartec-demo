@@ -16,6 +16,7 @@ public class AbonoConfiguration : IEntityTypeConfiguration<Abono>
         b.Property(x => x.Monto).HasColumnName("monto").HasColumnType("numeric(10,2)").IsRequired();
         b.Property(x => x.MedioPago).HasColumnName("medio_pago").HasConversion<string>().HasMaxLength(15).IsRequired()
             .HasDefaultValue(Jascartec.Domain.Enums.MedioPago.Efectivo);
+        b.Property(x => x.Concepto).HasColumnName("concepto").HasMaxLength(200);
 
         b.HasOne(x => x.Venta).WithMany(v => v.Abonos).HasForeignKey(x => x.VentaId).OnDelete(DeleteBehavior.Cascade);
     }

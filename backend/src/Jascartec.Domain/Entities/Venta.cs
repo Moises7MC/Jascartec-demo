@@ -26,6 +26,13 @@ public class Venta
     public FrecuenciaPago? FrecuenciaPago { get; set; }
     public int? NumCuotas { get; set; }
 
+    // Renovación de crédito: si este crédito nació absorbiendo el saldo pendiente de uno
+    // anterior del mismo cliente (porque ya solo le faltaba la última cuota), acá queda cuánto
+    // se le sumó y de cuál boleta viene — el crédito viejo se cierra con un abono automático
+    // por ese mismo monto (ver VentaService.CrearAsync).
+    public decimal SaldoAbsorbido { get; set; }
+    public int? VentaRenovadaId { get; set; }
+
     public Cliente? Cliente { get; set; }
     public Sucursal Sucursal { get; set; } = null!;
     public Usuario? Usuario { get; set; }
@@ -34,5 +41,5 @@ public class Venta
 
     public decimal Total => Items.Sum(i => i.PrecioUnit * i.Cantidad);
     public decimal MontoPagado => FormaPago == FormaPago.Contado ? Total : Abonos.Sum(a => a.Monto);
-    public decimal SaldoPendiente => (Total + Recargo) - MontoPagado;
+    public decimal SaldoPendiente => (Total + Recargo + SaldoAbsorbido) - MontoPagado;
 }

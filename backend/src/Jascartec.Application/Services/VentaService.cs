@@ -95,6 +95,8 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         FrecuenciaPago? frecuencia = null;
         int? numCuotas = null;
         DateOnly? fechaPagoAcordada = null;
+        var saldoAbsorbido = 0m;
+        var creditosARenovar = new List<Venta>();
 
         if (formaPago == FormaPago.Credito)
         {
@@ -110,11 +112,30 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             if (request.NumCuotas is null || request.NumCuotas < 1 || request.NumCuotas > maxCuotas)
                 throw new BusinessRuleException($"El número de cuotas para frecuencia {frecuencia} debe estar entre 1 y {maxCuotas} (máximo 2 meses).");
 
+            // Renovación: un cliente con un crédito activo solo puede sacar uno nuevo cuando a
+            // ESE crédito ya solo le falte pagar la última cuota — en ese caso, lo que le falte
+            // se suma al crédito nuevo (más abajo) y el viejo se cierra solo con un abono
+            // automático por ese saldo. Si le faltan 2 o más cuotas, se bloquea el crédito nuevo.
+            var creditosActivos = (await unitOfWork.Ventas.GetAllWithDetailsAsync(ct))
+                .Where(v => v.ClienteId == request.ClienteId && v.FormaPago == FormaPago.Credito
+                         && v.Estado == EstadoBoleta.Activa && v.SaldoPendiente > 0.01m)
+                .ToList();
+            foreach (var credito in creditosActivos)
+            {
+                var pendientes = ConstruirCronograma(credito).Count(c => !c.Pagada);
+                if (pendientes > 1)
+                    throw new BusinessRuleException(
+                        $"El cliente todavía tiene el crédito {credito.NumBoleta} con {pendientes} cuotas pendientes. " +
+                        "Solo puede sacar un crédito nuevo cuando le falte pagar la última cuota del actual.");
+            }
+            creditosARenovar = creditosActivos;
+            saldoAbsorbido = creditosActivos.Sum(v => v.SaldoPendiente);
+
             montoInicial = request.MontoInicial.Value;
             numCuotas = request.NumCuotas.Value;
             recargo = CalcularRecargo(montoInicial.Value, total);
 
-            var montoAFinanciar = (total - montoInicial.Value) + recargo;
+            var montoAFinanciar = (total - montoInicial.Value) + recargo + saldoAbsorbido;
             var (_, fechasCuotas) = CalcularPlanCuotas(fecha, frecuencia.Value, numCuotas.Value, montoAFinanciar);
             fechaPagoAcordada = fechasCuotas[^1];
         }
@@ -143,7 +164,9 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             MontoInicial = montoInicial,
             Recargo = recargo,
             FrecuenciaPago = frecuencia,
-            NumCuotas = numCuotas
+            NumCuotas = numCuotas,
+            SaldoAbsorbido = saldoAbsorbido,
+            VentaRenovadaId = creditosARenovar.FirstOrDefault()?.Id
         };
         await unitOfWork.Ventas.AddAsync(venta, ct);
         await unitOfWork.SaveChangesAsync(ct); // necesitamos el Id antes de crear los items
@@ -169,8 +192,25 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
         if (montoInicial is > 0)
         {
             venta.Abonos.Add(new Abono { VentaId = venta.Id, Fecha = fecha, Monto = montoInicial.Value, MedioPago = medioPago!.Value });
-            await unitOfWork.SaveChangesAsync(ct);
         }
+
+        // Cierra cada crédito absorbido con un abono automático por su saldo pendiente — así su
+        // propio saldo queda en 0 y sus cuotas restantes se marcan pagadas. El medio de pago
+        // "Renovacion" deja claro que no fue dinero en efectivo real (no debe contar en caja).
+        foreach (var credito in creditosARenovar)
+        {
+            credito.Abonos.Add(new Abono
+            {
+                VentaId = credito.Id,
+                Fecha = fecha,
+                Monto = credito.SaldoPendiente,
+                MedioPago = MedioPago.Renovacion,
+                Concepto = $"Absorbido en el crédito nuevo {venta.NumBoleta}"
+            });
+        }
+
+        if (montoInicial is > 0 || creditosARenovar.Count > 0)
+            await unitOfWork.SaveChangesAsync(ct);
 
         return await ObtenerAsync(venta.Id, ct);
     }
@@ -202,6 +242,8 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             throw new BusinessRuleException("Esta venta ya está anulada.");
         if (venta.Abonos.Count > 0)
             throw new BusinessRuleException("No se puede anular: esta venta ya tiene abonos registrados. Gestione la devolución del dinero por separado antes de anular.");
+        if (venta.SaldoAbsorbido > 0.01m)
+            throw new BusinessRuleException("No se puede anular: este crédito absorbió el saldo de un crédito anterior de este cliente al renovarlo.");
 
         // El correlativo (num_boleta) y el registro de la venta se conservan tal cual,
         // solo cambia el estado — así queda un rastro auditable. El stock vendido vuelve a
@@ -334,7 +376,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             return Array.Empty<CuotaCronogramaDto>();
 
         var montoInicial = v.MontoInicial ?? 0m;
-        var montoAFinanciar = (v.Total - montoInicial) + v.Recargo;
+        var montoAFinanciar = (v.Total - montoInicial) + v.Recargo + v.SaldoAbsorbido;
         var (montos, fechas) = CalcularPlanCuotas(v.Fecha, v.FrecuenciaPago.Value, v.NumCuotas.Value, montoAFinanciar);
 
         var abonadoSinInicial = Math.Max(0m, v.MontoPagado - montoInicial);
@@ -360,7 +402,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
                 i.EquipoId, producto.Id, producto.Marca.Nombre,
                 $"{producto.Marca.Nombre} {producto.Modelo}", i.Equipo?.Imei, i.Equipo?.Imei2, i.Cantidad, i.PrecioUnit);
         }).ToList();
-        var abonos = v.Abonos.OrderBy(a => a.Fecha).Select(a => new AbonoDto(a.Id, a.Fecha, a.Monto, a.MedioPago.ToString())).ToList();
+        var abonos = v.Abonos.OrderBy(a => a.Fecha).Select(a => new AbonoDto(a.Id, a.Fecha, a.Monto, a.MedioPago.ToString(), a.Concepto)).ToList();
         var cuotas = ConstruirCronograma(v);
 
         return new VentaDto(
@@ -370,6 +412,7 @@ public class VentaService(IUnitOfWork unitOfWork) : IVentaService
             v.FormaPago == FormaPago.Credito ? "Crédito" : "Contado", v.MedioPago?.ToString(), v.FechaPagoAcordada,
             items, abonos, v.Total, v.MontoPagado, v.SaldoPendiente,
             v.Estado.ToString(), v.FechaAnulacion, v.CreadoEn,
-            v.MontoInicial, v.Recargo, v.FrecuenciaPago?.ToString(), v.NumCuotas, cuotas);
+            v.MontoInicial, v.Recargo, v.FrecuenciaPago?.ToString(), v.NumCuotas, cuotas,
+            v.SaldoAbsorbido, v.VentaRenovadaId);
     }
 }

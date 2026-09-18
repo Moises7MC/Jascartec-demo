@@ -4,7 +4,7 @@ namespace Jascartec.Application.Dtos;
 /// es siempre 1 en una línea de equipo puntual.</summary>
 public record VentaItemDto(int? EquipoId, int ProductoId, string Marca, string Producto, string? Imei, string? Imei2, int Cantidad, decimal PrecioUnit);
 
-public record AbonoDto(int Id, DateOnly Fecha, decimal Monto, string MedioPago);
+public record AbonoDto(int Id, DateOnly Fecha, decimal Monto, string MedioPago, string? Concepto);
 
 /// <summary>Una cuota del plan de pagos de una venta a crédito. "Pagada" se calcula comparando lo abonado
 /// (sin contar el inicial) acumulado contra el monto acumulado del plan hasta esa cuota — no se persiste.</summary>
@@ -18,7 +18,8 @@ public record VentaDto(
     decimal Total, decimal MontoPagado, decimal SaldoPendiente,
     string Estado, DateOnly? FechaAnulacion, DateTimeOffset CreadoEn,
     decimal? MontoInicial, decimal Recargo, string? FrecuenciaPago, int? NumCuotas,
-    IReadOnlyList<CuotaCronogramaDto> Cuotas);
+    IReadOnlyList<CuotaCronogramaDto> Cuotas,
+    decimal SaldoAbsorbido, int? VentaRenovadaId);
 
 /// <summary>Una línea del carrito de venta: o bien un equipo puntual con IMEI (EquipoId, GET
 /// /api/equipos/disponibles), o bien N unidades de un producto por cantidad (ProductoId + Cantidad) —

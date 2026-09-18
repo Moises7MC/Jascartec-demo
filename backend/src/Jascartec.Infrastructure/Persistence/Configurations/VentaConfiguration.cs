@@ -35,10 +35,15 @@ public class VentaConfiguration : IEntityTypeConfiguration<Venta>
         b.Property(x => x.Recargo).HasColumnName("recargo").HasColumnType("numeric(10,2)").HasDefaultValue(0m);
         b.Property(x => x.FrecuenciaPago).HasColumnName("frecuencia_pago").HasConversion<string>().HasMaxLength(10);
         b.Property(x => x.NumCuotas).HasColumnName("num_cuotas");
+        b.Property(x => x.SaldoAbsorbido).HasColumnName("saldo_absorbido").HasColumnType("numeric(10,2)").HasDefaultValue(0m);
+        b.Property(x => x.VentaRenovadaId).HasColumnName("venta_renovada_id");
 
         b.HasOne(x => x.Cliente).WithMany(c => c.Ventas).HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.SetNull);
         b.HasOne(x => x.Sucursal).WithMany().HasForeignKey(x => x.SucursalId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Usuario).WithMany().HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
+        // Auto-referencia sin propiedad de navegación en C# (no hace falta ir y volver por
+        // código) — solo para trazabilidad: de qué boleta vino el saldo absorbido.
+        b.HasOne<Venta>().WithMany().HasForeignKey(x => x.VentaRenovadaId).OnDelete(DeleteBehavior.Restrict);
         b.Ignore(x => x.Total);
         b.Ignore(x => x.MontoPagado);
         b.Ignore(x => x.SaldoPendiente);
