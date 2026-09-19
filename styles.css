@@ -1436,3 +1436,42 @@ img {
 .boleta-tipo { display: block; margin-top: 2px; font-size: .78rem; font-weight: 800; letter-spacing: .02em; }
 .boleta-tipo--contado, .boleta-tipo--pagado { color: var(--success-color); }
 .boleta-tipo--credito { color: var(--amber-color); }
+
+/* Columna Acciones como desplegable (Ventas) */
+.acciones-trigger {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .4rem .75rem;
+  background: #fff;
+  border: 1.5px solid var(--border-color);
+  border-radius: .5rem;
+  color: var(--text-color);
+  font: inherit; font-size: var(--small-font-size); font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+.acciones-trigger:hover, .acciones-trigger.open { border-color: hsl(199, 89%, 48%); color: hsl(199, 89%, 40%); }
+.acciones-trigger i { font-size: 1.1rem; transition: transform .15s ease; }
+.acciones-trigger.open i { transform: rotate(180deg); }
+.acciones-menu {
+  position: fixed;
+  z-index: 150;
+  min-width: 11.5rem;
+  padding: .4rem;
+  background: #fff;
+  border-radius: .75rem;
+  box-shadow: 0 10px 30px hsla(0, 0%, 0%, .18);
+  display: none;
+}
+.acciones-menu.open { display: block; }
+.acciones-menu button {
+  width: 100%;
+  display: flex; align-items: center; gap: .7rem;
+  padding: .6rem .7rem;
+  background: none; border: none; border-radius: .5rem;
+  color: var(--text-color);
+  font: inherit; font-weight: 600; text-align: left;
+  cursor: pointer;
+}
+.acciones-menu button i { font-size: 1.2rem; }
+.acciones-menu button:hover { background: hsl(199, 92%, 95%); color: hsl(199, 89%, 40%); }
+.acciones-menu .acciones-menu__peligro:hover { background: hsl(0, 79%, 95%); color: var(--error-color); }

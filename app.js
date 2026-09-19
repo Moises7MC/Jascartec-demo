@@ -2100,6 +2100,54 @@ async function registrarAbono(ventaId) {
     }
 }
 
+// ---------- Menú desplegable de acciones (Ventas) ----------
+// Un solo menú flotante (position: fixed) que se reubica bajo el botón pulsado: así no lo recorta
+// el scroll horizontal de la tabla y no ocupa ancho en la columna.
+function cerrarMenuAcciones() {
+    const m = $('#menuAcciones');
+    if (m) m.classList.remove('open');
+    document.querySelectorAll('.acciones-trigger.open').forEach(b => b.classList.remove('open'));
+}
+
+function abrirMenuAccionesVenta(e, ventaId) {
+    e.stopPropagation();
+    const boton = e.currentTarget;
+    const yaAbierto = boton.classList.contains('open');
+    cerrarMenuAcciones();
+    if (yaAbierto) return;
+    const v = ventas.find(x => x.id === ventaId);
+    if (!v) return;
+
+    const items = [`<button type="button" onclick="cerrarMenuAcciones(); verBoleta(${v.id})"><i class="ri-eye-line"></i> Ver boleta</button>`];
+    if (!ventaEstaAnulada(v)) {
+        if (v.formaPago === 'Crédito') {
+            items.push(`<button type="button" onclick="cerrarMenuAcciones(); abrirGestionPago(${v.id})"><i class="${ventaEstaPagada(v) ? 'ri-checkbox-circle-line' : 'ri-wallet-3-line'}"></i> ${ventaEstaPagada(v) ? 'Ver pagos' : 'Gestionar pago'}</button>`);
+        }
+        items.push(`<button type="button" class="acciones-menu__peligro" onclick="cerrarMenuAcciones(); anularVenta(${v.id})"><i class="ri-close-circle-line"></i> Anular</button>`);
+    }
+
+    let menu = $('#menuAcciones');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'menuAcciones';
+        menu.className = 'acciones-menu';
+        menu.addEventListener('click', ev => ev.stopPropagation());
+        document.body.appendChild(menu);
+    }
+    menu.innerHTML = items.join('');
+    menu.classList.add('open');
+    boton.classList.add('open');
+
+    const r = boton.getBoundingClientRect();
+    const alto = menu.offsetHeight, ancho = menu.offsetWidth;
+    const abajo = r.bottom + 6 + alto <= window.innerHeight;
+    menu.style.top = `${abajo ? r.bottom + 6 : Math.max(8, r.top - 6 - alto)}px`;
+    menu.style.left = `${Math.max(8, Math.min(r.right - ancho, window.innerWidth - ancho - 8))}px`;
+}
+document.addEventListener('click', cerrarMenuAcciones);
+window.addEventListener('resize', cerrarMenuAcciones);
+window.addEventListener('scroll', cerrarMenuAcciones, true);
+
 // Registro + Reportes en un solo tab: el selector de período (por defecto "Todas las fechas")
 // recorta tanto las tarjetas como la tabla, y además respeta la sucursal elegida arriba (o el
 // negocio completo si está en "Todas las sucursales").
@@ -2166,16 +2214,9 @@ function renderVentas() {
                 <td>${nombreClienteVenta(v)}</td>
                 <td>${v.items.length}</td>
                 <td>${formatPEN(ventaTotal(v))}</td>
-                <td class="actions-icons">
-                    <button class="btn-icon-action btn-icon-action--historial" title="Ver boleta" onclick="verBoleta(${v.id})"><i class="ri-eye-line"></i></button>
-                    ${anulada
-                        ? '<span class="tag tag-red">Anulada</span>'
-                        : `
-                            ${v.formaPago === 'Crédito'
-                                ? `<button class="btn-icon-action ${ventaEstaPagada(v) ? 'btn-icon-action--exito' : 'btn-icon-action--editar'}" title="${ventaEstaPagada(v) ? 'Pagado' : 'Gestionar pago'}" onclick="abrirGestionPago(${v.id})"><i class="${ventaEstaPagada(v) ? 'ri-checkbox-circle-line' : 'ri-wallet-3-line'}"></i></button>`
-                                : ''}
-                            <button class="btn-icon-action btn-icon-action--eliminar" title="Anular" onclick="anularVenta(${v.id})"><i class="ri-close-circle-line"></i></button>
-                        `}
+                <td>
+                    ${anulada ? '<span class="tag tag-red">Anulada</span>' : ''}
+                    <button type="button" class="acciones-trigger" onclick="abrirMenuAccionesVenta(event, ${v.id})">Acciones <i class="ri-arrow-down-s-line"></i></button>
                 </td>
             </tr>
         `;
