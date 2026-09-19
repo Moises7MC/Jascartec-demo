@@ -1455,7 +1455,7 @@ img {
 .acciones-menu {
   position: fixed;
   z-index: 150;
-  min-width: 11.5rem;
+  min-width: 10rem;
   padding: .4rem;
   background: #fff;
   border-radius: .75rem;
@@ -1466,12 +1466,19 @@ img {
 .acciones-menu button {
   width: 100%;
   display: flex; align-items: center; gap: .7rem;
-  padding: .6rem .7rem;
+  padding: .45rem .6rem;
   background: none; border: none; border-radius: .5rem;
   color: var(--text-color);
-  font: inherit; font-weight: 600; text-align: left;
+  font: inherit; font-size: .8rem; font-weight: 600; text-align: left;
   cursor: pointer;
 }
-.acciones-menu button i { font-size: 1.2rem; }
-.acciones-menu button:hover { background: hsl(199, 92%, 95%); color: hsl(199, 89%, 40%); }
-.acciones-menu .acciones-menu__peligro:hover { background: hsl(0, 79%, 95%); color: var(--error-color); }
+.acciones-menu button { gap: .55rem; }
+.acciones-menu button i { font-size: 1rem; }
+.acciones-menu .acciones-menu__ver { color: hsl(199, 89%, 40%); }
+.acciones-menu .acciones-menu__ver:hover { background: hsl(199, 92%, 93%); }
+.acciones-menu .acciones-menu__pago { color: hsl(30, 80%, 40%); }
+.acciones-menu .acciones-menu__pago:hover { background: hsl(38, 92%, 93%); }
+.acciones-menu .acciones-menu__exito { color: var(--success-color); }
+.acciones-menu .acciones-menu__exito:hover { background: hsl(145, 63%, 94%); }
+.acciones-menu .acciones-menu__peligro { color: var(--error-color); }
+.acciones-menu .acciones-menu__peligro:hover { background: hsl(0, 79%, 95%); }

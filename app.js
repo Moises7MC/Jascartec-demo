@@ -2118,10 +2118,10 @@ function abrirMenuAccionesVenta(e, ventaId) {
     const v = ventas.find(x => x.id === ventaId);
     if (!v) return;
 
-    const items = [`<button type="button" onclick="cerrarMenuAcciones(); verBoleta(${v.id})"><i class="ri-eye-line"></i> Ver boleta</button>`];
+    const items = [`<button type="button" class="acciones-menu__ver" onclick="cerrarMenuAcciones(); verBoleta(${v.id})"><i class="ri-eye-line"></i> Ver boleta</button>`];
     if (!ventaEstaAnulada(v)) {
         if (v.formaPago === 'Crédito') {
-            items.push(`<button type="button" onclick="cerrarMenuAcciones(); abrirGestionPago(${v.id})"><i class="${ventaEstaPagada(v) ? 'ri-checkbox-circle-line' : 'ri-wallet-3-line'}"></i> ${ventaEstaPagada(v) ? 'Ver pagos' : 'Gestionar pago'}</button>`);
+            items.push(`<button type="button" class="${ventaEstaPagada(v) ? 'acciones-menu__exito' : 'acciones-menu__pago'}" onclick="cerrarMenuAcciones(); abrirGestionPago(${v.id})"><i class="${ventaEstaPagada(v) ? 'ri-checkbox-circle-line' : 'ri-wallet-3-line'}"></i> ${ventaEstaPagada(v) ? 'Ver pagos' : 'Gestionar pago'}</button>`);
         }
         items.push(`<button type="button" class="acciones-menu__peligro" onclick="cerrarMenuAcciones(); anularVenta(${v.id})"><i class="ri-close-circle-line"></i> Anular</button>`);
     }
