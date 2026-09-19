@@ -1486,3 +1486,8 @@ img {
 .btn-exportar--excel:hover { background: var(--success-color); color: #fff; box-shadow: 0 4px 12px hsla(145, 63%, 40%, .35); }
 .btn-exportar--pdf { background: hsl(0, 79%, 94%); color: hsl(0, 70%, 45%); }
 .btn-exportar--pdf:hover { background: var(--error-color); color: #fff; box-shadow: 0 4px 12px hsla(0, 79%, 55%, .35); }
+
+/* Tarjetas de Ventas: 2 filas de 3 columnas */
+.stats-grid--3col { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 700px) { .stats-grid--3col { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 460px) { .stats-grid--3col { grid-template-columns: 1fr; } }
