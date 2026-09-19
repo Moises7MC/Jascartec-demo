@@ -2544,49 +2544,54 @@ const ultimoDiaDelMes = (fechaISO) => {
 };
 
 // Convierte el tipo de período + la fecha eje (o el rango elegido a mano) en un [desde, hasta].
-function calcularRangoReporte() {
-    const tipo = $('#repTipoPeriodo').value;
-    const anio = repFechaAncla.slice(0, 4);
-    const mes = repFechaAncla.slice(0, 7);
-    const dia = parseInt(repFechaAncla.slice(8, 10));
+function rangoDePeriodo(tipo, ancla, desdeManual, hastaManual) {
+    const mes = ancla.slice(0, 7);
+    const dia = parseInt(ancla.slice(8, 10));
+    const finMes = String(ultimoDiaDelMes(ancla)).padStart(2, '0');
 
-    if (tipo === 'diario') return { desde: repFechaAncla, hasta: repFechaAncla };
+    if (tipo === 'diario') return { desde: ancla, hasta: ancla };
     if (tipo === 'semanal') {
-        const lunes = lunesDeLaSemana(repFechaAncla);
+        const lunes = lunesDeLaSemana(ancla);
         return { desde: lunes, hasta: sumarDias(lunes, 6) };
     }
     if (tipo === 'quincenal') {
         return dia <= 15
             ? { desde: `${mes}-01`, hasta: `${mes}-15` }
-            : { desde: `${mes}-16`, hasta: `${mes}-${String(ultimoDiaDelMes(repFechaAncla)).padStart(2, '0')}` };
+            : { desde: `${mes}-16`, hasta: `${mes}-${finMes}` };
     }
-    if (tipo === 'mensual') {
-        return { desde: `${mes}-01`, hasta: `${mes}-${String(ultimoDiaDelMes(repFechaAncla)).padStart(2, '0')}` };
-    }
+    if (tipo === 'mensual') return { desde: `${mes}-01`, hasta: `${mes}-${finMes}` };
     // Rango personalizado
-    const desde = $('#repDesde').value || repFechaAncla;
-    const hasta = $('#repHasta').value || repFechaAncla;
+    const desde = desdeManual || ancla;
+    const hasta = hastaManual || ancla;
     return desde <= hasta ? { desde, hasta } : { desde: hasta, hasta: desde };
 }
 
-// Botones ‹ › : retrocede o avanza un período completo (un día, una semana, una quincena o un mes).
-function moverPeriodoReporte(direccion) {
-    const tipo = $('#repTipoPeriodo').value;
-    if (tipo === 'diario') {
-        repFechaAncla = sumarDias(repFechaAncla, direccion);
-    } else if (tipo === 'semanal') {
-        repFechaAncla = sumarDias(repFechaAncla, 7 * direccion);
-    } else if (tipo === 'mensual') {
-        const d = new Date(repFechaAncla + 'T00:00:00');
+// Botones ‹ › : devuelve la nueva fecha eje tras retroceder/avanzar un período completo
+// (un día, una semana, una quincena o un mes).
+function moverAncla(tipo, ancla, direccion) {
+    if (tipo === 'diario') return sumarDias(ancla, direccion);
+    if (tipo === 'semanal') return sumarDias(ancla, 7 * direccion);
+    if (tipo === 'mensual') {
+        const d = new Date(ancla + 'T00:00:00');
         d.setMonth(d.getMonth() + direccion, 1);
-        repFechaAncla = fechaLocalISO(d);
-    } else if (tipo === 'quincenal') {
-        const dia = parseInt(repFechaAncla.slice(8, 10));
-        const d = new Date(repFechaAncla + 'T00:00:00');
+        return fechaLocalISO(d);
+    }
+    if (tipo === 'quincenal') {
+        const dia = parseInt(ancla.slice(8, 10));
+        const d = new Date(ancla + 'T00:00:00');
         if (direccion > 0) { if (dia <= 15) d.setDate(16); else d.setMonth(d.getMonth() + 1, 1); }
         else { if (dia <= 15) d.setMonth(d.getMonth() - 1, 16); else d.setDate(1); }
-        repFechaAncla = fechaLocalISO(d);
+        return fechaLocalISO(d);
     }
+    return ancla;
+}
+
+function calcularRangoReporte() {
+    return rangoDePeriodo($('#repTipoPeriodo').value, repFechaAncla, $('#repDesde').value, $('#repHasta').value);
+}
+
+function moverPeriodoReporte(direccion) {
+    repFechaAncla = moverAncla($('#repTipoPeriodo').value, repFechaAncla, direccion);
     $('#repFecha').value = repFechaAncla;
     renderVentasDesdeInicio();
 }
@@ -2977,6 +2982,36 @@ $('#formMovimientoCaja').addEventListener('submit', async (e) => {
 });
 
 let historialCajaCache = [];
+let cajaHistAncla = today(); // fecha "eje" para diario/semanal/quincenal/mensual
+
+// null = "Todas las fechas" (sin recorte).
+function rangoHistorialCaja() {
+    const tipo = $('#cajaHistTipo').value;
+    return tipo === 'todo' ? null : rangoDePeriodo(tipo, cajaHistAncla, $('#cajaHistDesde').value, $('#cajaHistHasta').value);
+}
+
+function moverPeriodoHistorialCaja(direccion) {
+    cajaHistAncla = moverAncla($('#cajaHistTipo').value, cajaHistAncla, direccion);
+    $('#cajaHistFecha').value = cajaHistAncla;
+    renderHistorialCaja();
+}
+
+function cambiarTipoHistorialCaja() {
+    const tipo = $('#cajaHistTipo').value;
+    const esRango = tipo === 'rango';
+    $('#cajaHistNavAncla').style.display = (esRango || tipo === 'todo') ? 'none' : '';
+    $('#cajaHistRangoWrap').style.display = esRango ? '' : 'none';
+    if (esRango && !$('#cajaHistDesde').value) {
+        $('#cajaHistDesde').value = cajaHistAncla;
+        $('#cajaHistHasta').value = cajaHistAncla;
+    }
+    renderHistorialCaja();
+}
+$('#cajaHistTipo').addEventListener('change', cambiarTipoHistorialCaja);
+$('#cajaHistFecha').addEventListener('change', () => { cajaHistAncla = $('#cajaHistFecha').value || today(); renderHistorialCaja(); });
+$('#cajaHistDesde').addEventListener('change', renderHistorialCaja);
+$('#cajaHistHasta').addEventListener('change', renderHistorialCaja);
+
 async function cargarHistorialCaja() {
     let historial = [];
     try {
@@ -3000,13 +3035,18 @@ function horaCajaHTML(isoDateTime, observaciones, marcaAutomatico) {
 }
 
 function renderHistorialCaja() {
-    const historial = historialCajaCache;
+    if (!$('#cajaHistFecha').value) $('#cajaHistFecha').value = cajaHistAncla;
+    const rango = rangoHistorialCaja();
+    const historial = rango
+        ? historialCajaCache.filter(c => c.fecha >= rango.desde && c.fecha <= rango.hasta)
+        : historialCajaCache;
     if (!historial.length) {
-        $('#cajaHistorialBody').innerHTML = '<tr><td colspan="9" class="empty-state">Todavía no se registró ninguna caja</td></tr>';
+        $('#cajaHistorialBody').innerHTML = `<tr><td colspan="9" class="empty-state">${historialCajaCache.length ? 'No hay cajas en ese período' : 'Todavía no se registró ninguna caja'}</td></tr>`;
         limpiarPaginacion('cajaHistorial');
         return;
     }
-    const pag = paginarTabla('cajaHistorial', historial, renderHistorialCaja, String(sucursalActualId));
+    const pag = paginarTabla('cajaHistorial', historial, renderHistorialCaja,
+        `${sucursalActualId}|${rango ? `${rango.desde}_${rango.hasta}` : 'todo'}`);
     $('#cajaHistorialBody').innerHTML = pag.filas.map(c => `
         <tr>
             <td>${formatDateLong(c.fecha)}</td>

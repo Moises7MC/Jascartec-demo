@@ -682,6 +682,25 @@
                         <div id="cajaEstadoContainer"></div>
 
                         <h3 class="section-subtitle" style="margin-top:2rem;">Historial de cajas</h3>
+                        <div class="reporte-controles">
+                            <select id="cajaHistTipo">
+                                <option value="todo">Todas las fechas</option>
+                                <option value="diario">Diario</option>
+                                <option value="semanal">Semanal</option>
+                                <option value="quincenal">Quincenal</option>
+                                <option value="mensual">Mensual</option>
+                                <option value="rango">Rango personalizado</option>
+                            </select>
+                            <div class="reporte-nav" id="cajaHistNavAncla" style="display:none;">
+                                <button type="button" class="btn-icon-nav" onclick="moverPeriodoHistorialCaja(-1)"><i class='bx bx-chevron-left'></i></button>
+                                <input type="date" id="cajaHistFecha">
+                                <button type="button" class="btn-icon-nav" onclick="moverPeriodoHistorialCaja(1)"><i class='bx bx-chevron-right'></i></button>
+                            </div>
+                            <div class="reporte-nav" id="cajaHistRangoWrap" style="display:none;">
+                                <label>Desde <input type="date" id="cajaHistDesde"></label>
+                                <label>Hasta <input type="date" id="cajaHistHasta"></label>
+                            </div>
+                        </div>
                         <div class="table-wrap">
                             <table class="table">
                                 <thead>
