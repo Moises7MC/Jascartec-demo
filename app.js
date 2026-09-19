@@ -2387,7 +2387,6 @@ function imprimirCobrosDelDia() {
 
 // ===================== REPORTES DE VENTAS =====================
 let repFechaAncla = today(); // fecha "eje" para diario/semanal/quincenal/mensual
-let chartReporteVentas = null;
 
 const sumarDias = (fechaISO, dias) => {
     const d = new Date(fechaISO + 'T00:00:00');
@@ -2504,7 +2503,6 @@ function renderReporteVentas() {
         `;
     }).join('') : '<tr><td colspan="6" class="empty-state">No hay ventas registradas en este período</td></tr>';
 
-    renderReporteChart(desde, hasta, activas);
     renderReportePorVendedor(activas);
 }
 
@@ -2534,30 +2532,6 @@ function renderReportePorVendedor(activas) {
             </tr>
         `).join('')
         : '<tr><td colspan="3" class="empty-state">No hay ventas registradas en este período</td></tr>';
-}
-
-function renderReporteChart(desde, hasta, activas) {
-    const ctx = document.getElementById('chartReporteVentas');
-    if (!ctx || typeof Chart === 'undefined') return;
-
-    const dias = [];
-    for (let d = desde; d <= hasta && dias.length <= 62; d = sumarDias(d, 1)) dias.push(d);
-
-    if (chartReporteVentas) { chartReporteVentas.destroy(); chartReporteVentas = null; }
-    if (dias.length > 62) { // rango demasiado largo para un gráfico por día
-        ctx.style.display = 'none';
-        $('#chartReporteVentasVacio').style.display = '';
-        return;
-    }
-    ctx.style.display = '';
-    $('#chartReporteVentasVacio').style.display = 'none';
-
-    const totalesPorDia = dias.map(d => activas.filter(v => v.fecha === d).reduce((s, v) => s + ventaTotal(v), 0));
-    chartReporteVentas = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: dias.map(formatDate), datasets: [{ label: 'Total vendido', data: totalesPorDia, backgroundColor: 'hsl(199, 92%, 50%)', borderRadius: 4 }] },
-        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-    });
 }
 
 // ---------- Exportar ----------
