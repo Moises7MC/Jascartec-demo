@@ -809,10 +809,10 @@ function renderInventario() {
                 <td>${formatPEN(p.precio)}</td>
                 <td><span class="tag ${est.tag}">${est.texto}</span></td>
                 <td>${formatFechaHora(p.creadoEn)}</td>
-                <td class="actions-cell">
-                    <button class="btn-small" onclick="editarProducto(${p.id})" data-roles="Administrador">Editar</button>
-                    <button class="btn-small-danger" onclick="eliminarProducto(${p.id})" data-roles="Administrador">Eliminar</button>
-                </td>
+                <td>${accionesDropdown([
+                    accionItem('Editar', 'ri-pencil-line', 'editar', `editarProducto(${p.id})`, ['Administrador']),
+                    accionItem('Eliminar', 'ri-delete-bin-6-line', 'peligro', `eliminarProducto(${p.id})`, ['Administrador']),
+                ])}</td>
             </tr>
         `;
     }).join('');
@@ -1403,10 +1403,10 @@ function renderIngresos() {
                 <td>${cantLineas}</td>
                 <td>${formatPEN(total)}</td>
                 <td>${formatFechaHora(i.creadoEn)}</td>
-                <td class="actions-cell">
-                    <button class="btn-small" onclick="verIngreso(${i.id})">Ver</button>
-                    <button class="btn-small-danger" onclick="eliminarIngreso(${i.id})">Eliminar</button>
-                </td>
+                <td>${accionesDropdown([
+                    accionItem('Ver', 'ri-eye-line', 'ver', `verIngreso(${i.id})`),
+                    accionItem('Eliminar', 'ri-delete-bin-6-line', 'peligro', `eliminarIngreso(${i.id})`),
+                ])}</td>
             </tr>
         `;
     }).join('');
@@ -2100,31 +2100,33 @@ async function registrarAbono(ventaId) {
     }
 }
 
-// ---------- Menú desplegable de acciones (Ventas) ----------
-// Un solo menú flotante (position: fixed) que se reubica bajo el botón pulsado: así no lo recorta
-// el scroll horizontal de la tabla y no ocupa ancho en la columna.
+// ---------- Menú desplegable de acciones (todas las tablas) ----------
+// Cada fila pinta un botón "Acciones" con sus opciones serializadas en data-items; un solo menú
+// flotante (position: fixed) se reubica bajo el botón pulsado, así no lo recorta el scroll
+// horizontal de la tabla ni ocupa ancho en la columna.
+// tipo → color: ver (azul), editar (ámbar), exito (verde), peligro (rojo).
+const accionItem = (texto, icon, tipo, js, roles) => ({ texto, icon, tipo, js, roles });
+const escapeAttr = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+function accionesDropdown(items) {
+    const visibles = items.filter(i => i && (!i.roles || i.roles.includes(currentUser.rol)));
+    if (!visibles.length) return '';
+    const datos = visibles.map(({ texto, icon, tipo, js }) => ({ texto, icon, tipo, js }));
+    return `<button type="button" class="acciones-trigger" data-items="${escapeAttr(JSON.stringify(datos))}" onclick="abrirMenuAcciones(event)">Acciones <i class="ri-arrow-down-s-line"></i></button>`;
+}
+
 function cerrarMenuAcciones() {
     const m = $('#menuAcciones');
     if (m) m.classList.remove('open');
     document.querySelectorAll('.acciones-trigger.open').forEach(b => b.classList.remove('open'));
 }
 
-function abrirMenuAccionesVenta(e, ventaId) {
+function abrirMenuAcciones(e) {
     e.stopPropagation();
     const boton = e.currentTarget;
     const yaAbierto = boton.classList.contains('open');
     cerrarMenuAcciones();
     if (yaAbierto) return;
-    const v = ventas.find(x => x.id === ventaId);
-    if (!v) return;
-
-    const items = [`<button type="button" class="acciones-menu__ver" onclick="cerrarMenuAcciones(); verBoleta(${v.id})"><i class="ri-eye-line"></i> Ver boleta</button>`];
-    if (!ventaEstaAnulada(v)) {
-        if (v.formaPago === 'Crédito') {
-            items.push(`<button type="button" class="${ventaEstaPagada(v) ? 'acciones-menu__exito' : 'acciones-menu__pago'}" onclick="cerrarMenuAcciones(); abrirGestionPago(${v.id})"><i class="${ventaEstaPagada(v) ? 'ri-checkbox-circle-line' : 'ri-wallet-3-line'}"></i> ${ventaEstaPagada(v) ? 'Ver pagos' : 'Gestionar pago'}</button>`);
-        }
-        items.push(`<button type="button" class="acciones-menu__peligro" onclick="cerrarMenuAcciones(); anularVenta(${v.id})"><i class="ri-close-circle-line"></i> Anular</button>`);
-    }
 
     let menu = $('#menuAcciones');
     if (!menu) {
@@ -2134,7 +2136,9 @@ function abrirMenuAccionesVenta(e, ventaId) {
         menu.addEventListener('click', ev => ev.stopPropagation());
         document.body.appendChild(menu);
     }
-    menu.innerHTML = items.join('');
+    menu.innerHTML = JSON.parse(boton.dataset.items).map(i =>
+        `<button type="button" class="acciones-menu__${i.tipo}" onclick="${escapeAttr('cerrarMenuAcciones(); ' + i.js)}"><i class="${i.icon}"></i> ${i.texto}</button>`
+    ).join('');
     menu.classList.add('open');
     boton.classList.add('open');
 
@@ -2216,7 +2220,13 @@ function renderVentas() {
                 <td>${formatPEN(ventaTotal(v))}</td>
                 <td>
                     ${anulada ? '<span class="tag tag-red">Anulada</span>' : ''}
-                    <button type="button" class="acciones-trigger" onclick="abrirMenuAccionesVenta(event, ${v.id})">Acciones <i class="ri-arrow-down-s-line"></i></button>
+                    ${accionesDropdown(anulada ? [
+                        accionItem('Ver boleta', 'ri-eye-line', 'ver', `verBoleta(${v.id})`),
+                    ] : [
+                        accionItem('Ver boleta', 'ri-eye-line', 'ver', `verBoleta(${v.id})`),
+                        v.formaPago === 'Crédito' && accionItem(ventaEstaPagada(v) ? 'Ver pagos' : 'Gestionar pago', ventaEstaPagada(v) ? 'ri-checkbox-circle-line' : 'ri-wallet-3-line', ventaEstaPagada(v) ? 'exito' : 'editar', `abrirGestionPago(${v.id})`),
+                        accionItem('Anular', 'ri-close-circle-line', 'peligro', `anularVenta(${v.id})`),
+                    ])}
                 </td>
             </tr>
         `;
@@ -2290,10 +2300,10 @@ function renderCreditos() {
                 <td>${formatPEN(saldo)}</td>
                 <td>${proximaCuota ? formatDate(proximaCuota.fechaVencimiento) : '—'}</td>
                 <td><span class="tag ${tag}">${texto}</span></td>
-                <td class="actions-cell">
-                    <button class="btn-small" onclick="verBoleta(${v.id})">Ver</button>
-                    <button class="btn-small${ventaEstaPagada(v) ? '' : '-danger'}" onclick="abrirGestionPago(${v.id})">${ventaEstaPagada(v) ? 'Pagado' : 'Gestionar pago'}</button>
-                </td>
+                <td>${accionesDropdown([
+                    accionItem('Ver boleta', 'ri-eye-line', 'ver', `verBoleta(${v.id})`),
+                    accionItem(ventaEstaPagada(v) ? 'Ver pagos' : 'Gestionar pago', ventaEstaPagada(v) ? 'ri-checkbox-circle-line' : 'ri-wallet-3-line', ventaEstaPagada(v) ? 'exito' : 'peligro', `abrirGestionPago(${v.id})`),
+                ])}</td>
             </tr>
         `;
     }).join('');
@@ -2366,9 +2376,9 @@ function renderCobranzasActivos() {
                 <td>${cuotasPagadas} / ${v.numCuotas ?? 0}</td>
                 <td>${prox ? formatDate(prox.fechaVencimiento) : '—'}</td>
                 <td>${diasAtraso > 0 ? `<span class="tag tag-red">${diasAtraso} día${diasAtraso === 1 ? '' : 's'}</span>` : '<span class="tag tag-green">Al día</span>'}</td>
-                <td class="actions-icons">
-                    <button class="btn-icon-action btn-icon-action--historial" title="Ver cronograma / gestionar pago" onclick="abrirGestionPago(${v.id})"><i class="ri-calendar-check-line"></i></button>
-                </td>
+                <td>${accionesDropdown([
+                    accionItem('Ver cronograma / pago', 'ri-calendar-check-line', 'ver', `abrirGestionPago(${v.id})`),
+                ])}</td>
             </tr>
         `;
     }).join('') : '<tr><td colspan="11" class="empty-state">No hay créditos activos con esos filtros</td></tr>';
@@ -2393,9 +2403,9 @@ function renderCobrosPorFecha() {
             <td>${v.numBoleta}</td>
             <td>${c.numero}</td>
             <td>${formatPEN(c.monto)}</td>
-            <td class="actions-icons">
-                <button class="btn-icon-action btn-icon-action--historial" title="Gestionar pago" onclick="abrirGestionPago(${v.id})"><i class="ri-wallet-3-line"></i></button>
-            </td>
+            <td>${accionesDropdown([
+                accionItem('Gestionar pago', 'ri-wallet-3-line', 'ver', `abrirGestionPago(${v.id})`),
+            ])}</td>
         </tr>
     `).join('') : '<tr><td colspan="8" class="empty-state">No hay cobros programados para esta fecha</td></tr>';
 }
@@ -3189,11 +3199,10 @@ function tablaComprasCliente(hist) {
     const filas = lista.map(v => {
         const anulada = ventaEstaAnulada(v);
         const { tag, texto } = tagFormaPago(v);
-        const accion = anulada
-            ? `<button class="btn-small" onclick="verBoleta(${v.id})">Ver</button>`
-            : (v.formaPago === 'Crédito'
-                ? `<button class="btn-small" onclick="closeModal('modalHistorialCrediticio'); abrirGestionPago(${v.id})">Gestionar pago</button>`
-                : `<button class="btn-small" onclick="verBoleta(${v.id})">Ver</button>`);
+        const accion = accionesDropdown([
+            accionItem('Ver boleta', 'ri-eye-line', 'ver', `verBoleta(${v.id})`),
+            !anulada && v.formaPago === 'Crédito' && accionItem('Gestionar pago', 'ri-wallet-3-line', 'editar', `closeModal('modalHistorialCrediticio'); abrirGestionPago(${v.id})`),
+        ]);
         return `
             <tr style="${anulada ? 'opacity:.55;' : ''}">
                 <td><strong>${v.numBoleta}</strong></td>
@@ -3201,13 +3210,13 @@ function tablaComprasCliente(hist) {
                 <td>${v.formaPago}</td>
                 <td>${formatPEN(ventaTotal(v) + (v.recargo || 0) + (v.saldoAbsorbido || 0))}</td>
                 <td>${anulada ? '<span class="tag tag-red">Anulada</span>' : `<span class="tag ${tag}">${texto}</span>`}</td>
-                <td class="actions-cell">${accion}</td>
+                <td>${accion}</td>
             </tr>
         `;
     }).join('');
     return `
         <table class="table table--sm">
-            <thead><tr><th>Boleta</th><th>Fecha</th><th>Forma de pago</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Boleta</th><th>Fecha</th><th>Forma de pago</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody>${filas}</tbody>
         </table>
     `;
@@ -3330,11 +3339,11 @@ function renderClientes() {
             <td>${renderEstrellas(hist.estrellas)}${renderNivelCliente(hist.estrellas)}</td>
             <td><span class="badge-estado badge-estado--${hist.estado}">${hist.estadoTexto}</span></td>
             <td>${hist.saldoPendienteTotal > 0.01 ? `<span class="entity-info--deuda">${formatPEN(hist.saldoPendienteTotal)}</span>` : '—'}</td>
-            <td class="actions-icons">
-                <button class="btn-icon-action btn-icon-action--historial" title="Ver historial" onclick="abrirHistorialCrediticio(${c.id})"><i class="ri-list-unordered"></i></button>
-                <button class="btn-icon-action btn-icon-action--editar" title="Editar" onclick="editarCliente(${c.id})"><i class="ri-pencil-line"></i></button>
-                <button class="btn-icon-action btn-icon-action--eliminar" title="Eliminar" onclick="eliminarCliente(${c.id})"><i class="ri-delete-bin-6-line"></i></button>
-            </td>
+            <td>${accionesDropdown([
+                accionItem('Ver historial', 'ri-list-unordered', 'ver', `abrirHistorialCrediticio(${c.id})`),
+                accionItem('Editar', 'ri-pencil-line', 'editar', `editarCliente(${c.id})`),
+                accionItem('Eliminar', 'ri-delete-bin-6-line', 'peligro', `eliminarCliente(${c.id})`),
+            ])}</td>
         </tr>
     `;
     }).join('');

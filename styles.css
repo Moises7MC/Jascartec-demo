@@ -1476,8 +1476,8 @@ img {
 .acciones-menu button i { font-size: 1rem; }
 .acciones-menu .acciones-menu__ver { color: hsl(199, 89%, 40%); }
 .acciones-menu .acciones-menu__ver:hover { background: hsl(199, 92%, 93%); }
-.acciones-menu .acciones-menu__pago { color: hsl(30, 80%, 40%); }
-.acciones-menu .acciones-menu__pago:hover { background: hsl(38, 92%, 93%); }
+.acciones-menu .acciones-menu__editar { color: hsl(30, 80%, 40%); }
+.acciones-menu .acciones-menu__editar:hover { background: hsl(38, 92%, 93%); }
 .acciones-menu .acciones-menu__exito { color: var(--success-color); }
 .acciones-menu .acciones-menu__exito:hover { background: hsl(145, 63%, 94%); }
 .acciones-menu .acciones-menu__peligro { color: var(--error-color); }
