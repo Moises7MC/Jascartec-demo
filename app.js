@@ -821,12 +821,6 @@ function renderInventario() {
 $('#invSearch').addEventListener('input', renderInventario);
 $('#filterMarca').addEventListener('change', renderInventario);
 $('#filterCategoria').addEventListener('change', renderInventario);
-$('#globalSearch').addEventListener('input', (e) => {
-    if ($('#view-inventario').classList.contains('active')) {
-        $('#invSearch').value = e.target.value;
-        renderInventario();
-    }
-});
 
 // ===================== PRODUCTOS (CRUD) =====================
 // Imagen subida en el modal (base64). null = no se tocó / usar la que ya tenía.

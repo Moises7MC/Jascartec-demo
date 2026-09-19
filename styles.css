@@ -389,17 +389,6 @@ img {
 }
 .topbar__title { font-size: 1.5rem; }
 .topbar__subtitle { font-size: var(--small-font-size); color: var(--text-color-light); margin-top: .15rem; }
-.topbar__search {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  background: var(--container-color);
-  border-radius: 2rem;
-  padding: .6rem 1rem;
-  min-width: 260px;
-}
-.topbar__search i { color: var(--text-color-light); }
-.topbar__search input { width: 100%; }
 
 .topbar__sucursal {
   display: flex;
@@ -1240,7 +1229,6 @@ img {
 @media (max-width: 900px) {
   .views { padding: 1.25rem 1.25rem 2.5rem; }
   .topbar { padding: 1.1rem 1.25rem; }
-  .topbar__search { min-width: 0; flex: 1; }
   .topbar__sucursal { order: -1; width: 100%; }
 }
 
