@@ -2100,20 +2100,29 @@ async function registrarAbono(ventaId) {
     }
 }
 
+// Registro + Reportes en un solo tab: el selector de período (por defecto "Todas las fechas")
+// recorta tanto las tarjetas como la tabla, y además respeta la sucursal elegida arriba (o el
+// negocio completo si está en "Todas las sucursales").
 function renderVentas() {
-    if (!ventas.length) {
-        $('#ventasBody').innerHTML = '<tr><td colspan="7" class="empty-state">Aún no hay ventas registradas</td></tr>';
-        return;
-    }
+    if (!$('#repFecha').value) $('#repFecha').value = repFechaAncla;
+    const tipoPeriodo = $('#repTipoPeriodo').value;
+    const rango = tipoPeriodo === 'todo' ? null : calcularRangoReporte();
+    $('#repPeriodoLabel').textContent = !rango ? '' : (rango.desde === rango.hasta
+        ? formatDateLong(rango.desde)
+        : `${formatDateLong(rango.desde)} — ${formatDateLong(rango.hasta)}`);
 
-    // Tanto las tarjetas de arriba como la tabla se filtran por la sucursal elegida en la
-    // barra superior — igual que Inventario, para que Ventas siempre muestre "lo de esta
-    // tienda" (o el negocio completo si está en "Todas las sucursales").
-    const ventasSucursal = ventas.filter(v => sucursalActualId === 'todas' || v.sucursalId === sucursalActualId);
+    const ventasSucursal = ventas.filter(v =>
+        (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId) &&
+        (!rango || (v.fecha >= rango.desde && v.fecha <= rango.hasta)));
     const activas = ventasSucursal.filter(v => !ventaEstaAnulada(v));
     const totalFacturado = activas.reduce((s, v) => s + ventaTotal(v), 0);
+    const totalContado = activas.filter(v => v.formaPago !== 'Crédito').reduce((s, v) => s + ventaTotal(v), 0);
+    const totalCredito = activas.filter(v => v.formaPago === 'Crédito').reduce((s, v) => s + ventaTotal(v), 0);
     $('#ventasTotalFacturado').textContent = formatPEN(totalFacturado);
+    $('#ventasNumVentas').textContent = activas.length;
     $('#ventasTicketProm').textContent = formatPEN(activas.length ? totalFacturado / activas.length : 0);
+    $('#ventasTotalContado').textContent = formatPEN(totalContado);
+    $('#ventasTotalCredito').textContent = formatPEN(totalCredito);
 
     const conteoProducto = {};
     activas.forEach(v => v.items.forEach(it => {
@@ -2121,6 +2130,8 @@ function renderVentas() {
     }));
     const topId = Object.entries(conteoProducto).sort((a, b) => b[1] - a[1])[0]?.[0];
     $('#ventasProductoTop').textContent = topId ? nombreProducto(findProducto(parseInt(topId))) : '—';
+
+    renderReportePorVendedor(activas);
 
     // La tabla además respeta el buscador y el filtro de estado (Activas/Anuladas/Todas).
     const busqueda = ($('#venSearch').value || '').trim().toLowerCase();
@@ -2138,7 +2149,7 @@ function renderVentas() {
     }
 
     if (!lista.length) {
-        $('#ventasBody').innerHTML = '<tr><td colspan="7" class="empty-state">No se encontraron ventas con esos filtros</td></tr>';
+        $('#ventasBody').innerHTML = `<tr><td colspan="7" class="empty-state">${ventas.length ? 'No se encontraron ventas con esos filtros' : 'Aún no hay ventas registradas'}</td></tr>`;
         return;
     }
 
@@ -2196,9 +2207,7 @@ function cambiarTabVentas(tab) {
     $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.ventasTab === tab));
     $('#ventasTabRegistro').style.display = tab === 'registro' ? '' : 'none';
     $('#ventasTabCreditos').style.display = tab === 'creditos' ? '' : 'none';
-    $('#ventasTabReportes').style.display = tab === 'reportes' ? '' : 'none';
     if (tab === 'creditos') renderCreditos();
-    if (tab === 'reportes') renderReporteVentas();
 }
 
 function renderCreditos() {
@@ -2449,62 +2458,24 @@ function moverPeriodoReporte(direccion) {
         repFechaAncla = fechaLocalISO(d);
     }
     $('#repFecha').value = repFechaAncla;
-    renderReporteVentas();
+    renderVentas();
 }
 
 function cambiarTipoPeriodoReporte() {
-    const esRango = $('#repTipoPeriodo').value === 'rango';
-    $('#repNavAncla').style.display = esRango ? 'none' : '';
+    const tipo = $('#repTipoPeriodo').value;
+    const esRango = tipo === 'rango';
+    $('#repNavAncla').style.display = (esRango || tipo === 'todo') ? 'none' : '';
     $('#repRangoWrap').style.display = esRango ? '' : 'none';
     if (esRango && !$('#repDesde').value) {
         $('#repDesde').value = repFechaAncla;
         $('#repHasta').value = repFechaAncla;
     }
-    renderReporteVentas();
+    renderVentas();
 }
 $('#repTipoPeriodo').addEventListener('change', cambiarTipoPeriodoReporte);
-$('#repFecha').addEventListener('change', () => { repFechaAncla = $('#repFecha').value || today(); renderReporteVentas(); });
-$('#repDesde').addEventListener('change', renderReporteVentas);
-$('#repHasta').addEventListener('change', renderReporteVentas);
-
-function renderReporteVentas() {
-    if (!$('#repFecha').value) $('#repFecha').value = repFechaAncla;
-    const { desde, hasta } = calcularRangoReporte();
-    $('#repPeriodoLabel').textContent = desde === hasta
-        ? formatDateLong(desde)
-        : `${formatDateLong(desde)} — ${formatDateLong(hasta)}`;
-
-    // Igual que el resto de vistas: se respeta la sucursal elegida arriba (o el negocio
-    // completo si está en "Todas las sucursales").
-    const enRango = ventas.filter(v => (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId) && v.fecha >= desde && v.fecha <= hasta);
-    const activas = enRango.filter(v => !ventaEstaAnulada(v));
-    const totalVendido = activas.reduce((s, v) => s + ventaTotal(v), 0);
-    const totalContado = activas.filter(v => v.formaPago !== 'Crédito').reduce((s, v) => s + ventaTotal(v), 0);
-    const totalCredito = activas.filter(v => v.formaPago === 'Crédito').reduce((s, v) => s + ventaTotal(v), 0);
-
-    $('#repTotalVendido').textContent = formatPEN(totalVendido);
-    $('#repNumVentas').textContent = activas.length;
-    $('#repTicketProm').textContent = formatPEN(activas.length ? totalVendido / activas.length : 0);
-    $('#repTotalContado').textContent = formatPEN(totalContado);
-    $('#repTotalCredito').textContent = formatPEN(totalCredito);
-
-    const lista = [...enRango].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id - b.id);
-    $('#reporteVentasBody').innerHTML = lista.length ? lista.map(v => {
-        const anulada = ventaEstaAnulada(v);
-        return `
-            <tr style="${anulada ? 'opacity:.55;' : ''}">
-                <td><strong style="${anulada ? 'text-decoration:line-through;' : ''}">${v.numBoleta}</strong></td>
-                <td>${formatDate(v.fecha)} <small class="muted">${formatHora(v.creadoEn)}</small></td>
-                <td>${nombreClienteVenta(v)}</td>
-                <td>${v.formaPago}</td>
-                <td>${formatPEN(ventaTotal(v))}</td>
-                <td>${anulada ? '<span class="tag tag-red">Anulada</span>' : '<span class="tag tag-green">Activa</span>'}</td>
-            </tr>
-        `;
-    }).join('') : '<tr><td colspan="6" class="empty-state">No hay ventas registradas en este período</td></tr>';
-
-    renderReportePorVendedor(activas);
-}
+$('#repFecha').addEventListener('change', () => { repFechaAncla = $('#repFecha').value || today(); renderVentas(); });
+$('#repDesde').addEventListener('change', renderVentas);
+$('#repHasta').addEventListener('change', renderVentas);
 
 // Solo para el Administrador: cuánto vendió cada trabajador en el período elegido — se
 // agrupa por vendedorId; las ventas de antes de que existiera este dato (o "Cliente varios"
@@ -2536,11 +2507,11 @@ function renderReportePorVendedor(activas) {
 
 // ---------- Exportar ----------
 function filasReporteParaExportar() {
-    const { desde, hasta } = calcularRangoReporte();
+    const rango = $('#repTipoPeriodo').value === 'todo' ? null : calcularRangoReporte();
     const lista = ventas
-        .filter(v => (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId) && v.fecha >= desde && v.fecha <= hasta)
+        .filter(v => (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId) && (!rango || (v.fecha >= rango.desde && v.fecha <= rango.hasta)))
         .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id - b.id);
-    return { desde, hasta, lista };
+    return { desde: rango?.desde ?? null, hasta: rango?.hasta ?? null, lista };
 }
 
 function exportarReporteExcel() {
@@ -2562,7 +2533,7 @@ function exportarReporteExcel() {
     const hoja = XLSX.utils.json_to_sheet(filas);
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, 'Ventas');
-    XLSX.writeFile(libro, `reporte-ventas_${desde}_a_${hasta}.xlsx`);
+    XLSX.writeFile(libro, desde ? `reporte-ventas_${desde}_a_${hasta}.xlsx` : 'reporte-ventas_todas-las-fechas.xlsx');
 }
 
 function exportarReportePDF() {
@@ -2578,7 +2549,7 @@ function exportarReportePDF() {
     doc.text('Jascartec — Reporte de ventas', 14, 18);
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Período: ${formatDateLong(desde)} — ${formatDateLong(hasta)}`, 14, 26);
+    doc.text(desde ? `Período: ${formatDateLong(desde)} — ${formatDateLong(hasta)}` : 'Período: todas las fechas', 14, 26);
     doc.text(`Total vendido: ${formatPEN(totalVendido)}   ·   N° de ventas: ${activas.length}   ·   Ticket promedio: ${formatPEN(activas.length ? totalVendido / activas.length : 0)}`, 14, 32);
 
     doc.autoTable({
@@ -2588,7 +2559,7 @@ function exportarReportePDF() {
         styles: { fontSize: 8 },
         headStyles: { fillColor: [16, 145, 224] }
     });
-    doc.save(`reporte-ventas_${desde}_a_${hasta}.pdf`);
+    doc.save(desde ? `reporte-ventas_${desde}_a_${hasta}.pdf` : 'reporte-ventas_todas-las-fechas.pdf');
 }
 
 // ===================== FLUJO DE CAJA =====================
