@@ -2163,6 +2163,33 @@ let ventasPorPagina = 25;
 // de arriba siguen mostrando el período completo, con su desglose contado vs crédito).
 let ventasTipoFiltro = 'todos';
 
+// Filtro por vendedor (solo Administrador): aplica a tarjetas, tabla y exportación. Las opciones
+// salen de los vendedores que realmente tienen ventas (más "Sin vendedor" para las antiguas).
+function ventaPasaFiltroVendedor(v) {
+    const sel = $('#venFiltroVendedor');
+    const f = sel ? sel.value : 'todos';
+    if (f === 'todos') return true;
+    if (f === 'sin-registro') return v.vendedorId == null;
+    return v.vendedorId === parseInt(f);
+}
+
+function poblarFiltroVendedor() {
+    const sel = $('#venFiltroVendedor');
+    if (!sel) return;
+    const previo = sel.value;
+    const vendedores = new Map();
+    let haySinRegistro = false;
+    ventas.forEach(v => {
+        if (v.vendedorId == null) haySinRegistro = true;
+        else vendedores.set(v.vendedorId, v.vendedor || `Vendedor ${v.vendedorId}`);
+    });
+    const opciones = [...vendedores.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    sel.innerHTML = '<option value="todos">Todos los vendedores</option>'
+        + opciones.map(([id, nombre]) => `<option value="${id}">${nombre}</option>`).join('')
+        + (haySinRegistro ? '<option value="sin-registro">Sin vendedor registrado</option>' : '');
+    sel.value = [...sel.options].some(o => o.value === previo) ? previo : 'todos';
+}
+
 function cambiarTipoVenta(tipo) {
     ventasTipoFiltro = tipo;
     $$('#venTipoTabs .pill-tab').forEach(b => b.classList.toggle('active', b.dataset.tipo === tipo));
@@ -2177,9 +2204,11 @@ function renderVentas() {
         ? formatDateLong(rango.desde)
         : `${formatDateLong(rango.desde)} — ${formatDateLong(rango.hasta)}`);
 
+    poblarFiltroVendedor();
     const ventasSucursal = ventas.filter(v =>
         (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId) &&
-        (!rango || (v.fecha >= rango.desde && v.fecha <= rango.hasta)));
+        (!rango || (v.fecha >= rango.desde && v.fecha <= rango.hasta)) &&
+        ventaPasaFiltroVendedor(v));
     const activas = ventasSucursal.filter(v => !ventaEstaAnulada(v));
     const totalFacturado = activas.reduce((s, v) => s + ventaTotal(v), 0);
     const totalContado = activas.filter(v => v.formaPago !== 'Crédito').reduce((s, v) => s + ventaTotal(v), 0);
@@ -2274,6 +2303,7 @@ function cambiarPorPaginaVentas(valor) {
 
 $('#venSearch').addEventListener('input', renderVentasDesdeInicio);
 $('#venFiltroEstado').addEventListener('change', renderVentasDesdeInicio);
+$('#venFiltroVendedor').addEventListener('change', renderVentasDesdeInicio);
 
 async function anularVenta(ventaId) {
     const v = ventas.find(x => x.id === ventaId);
@@ -2609,7 +2639,7 @@ function renderReportePorVendedor(activas) {
 function filasReporteParaExportar() {
     const rango = $('#repTipoPeriodo').value === 'todo' ? null : calcularRangoReporte();
     const lista = ventas
-        .filter(v => (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId) && (!rango || (v.fecha >= rango.desde && v.fecha <= rango.hasta)))
+        .filter(v => (sucursalActualId === 'todas' || v.sucursalId === sucursalActualId) && (!rango || (v.fecha >= rango.desde && v.fecha <= rango.hasta)) && ventaPasaFiltroVendedor(v))
         .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id - b.id);
     return { desde: rango?.desde ?? null, hasta: rango?.hasta ?? null, lista };
 }
