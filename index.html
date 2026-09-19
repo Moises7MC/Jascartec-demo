@@ -523,29 +523,11 @@
 
                     <div class="ventas-tab-panel" id="ventasTabRegistro">
                         <div class="reporte-controles">
-                            <select id="repTipoPeriodo">
-                                <option value="todo">Todas las fechas</option>
-                                <option value="diario">Diario</option>
-                                <option value="semanal">Semanal</option>
-                                <option value="quincenal">Quincenal</option>
-                                <option value="mensual">Mensual</option>
-                                <option value="rango">Rango personalizado</option>
-                            </select>
-                            <div class="reporte-nav" id="repNavAncla" style="display:none;">
-                                <button type="button" class="btn-icon-nav" onclick="moverPeriodoReporte(-1)"><i class='bx bx-chevron-left'></i></button>
-                                <input type="date" id="repFecha">
-                                <button type="button" class="btn-icon-nav" onclick="moverPeriodoReporte(1)"><i class='bx bx-chevron-right'></i></button>
-                            </div>
-                            <div class="reporte-nav" id="repRangoWrap" style="display:none;">
-                                <label>Desde <input type="date" id="repDesde"></label>
-                                <label>Hasta <input type="date" id="repHasta"></label>
-                            </div>
                             <div class="reporte-exportar">
                                 <button type="button" class="btn-small-outline" onclick="exportarReporteExcel()"><i class='bx bx-file'></i> Excel</button>
                                 <button type="button" class="btn-small-outline" onclick="exportarReportePDF()"><i class='bx bxs-file-pdf'></i> PDF</button>
                             </div>
                         </div>
-                        <h3 class="reporte-periodo-label" id="repPeriodoLabel"></h3>
 
                         <div class="stats-grid stats-grid--compact">
                             <div class="stat-card">
@@ -585,6 +567,27 @@
                                 <option value="todas">Todas</option>
                             </select>
                         </div>
+
+                        <div class="reporte-controles">
+                            <select id="repTipoPeriodo">
+                                <option value="todo">Todas las fechas</option>
+                                <option value="diario">Diario</option>
+                                <option value="semanal">Semanal</option>
+                                <option value="quincenal">Quincenal</option>
+                                <option value="mensual">Mensual</option>
+                                <option value="rango">Rango personalizado</option>
+                            </select>
+                            <div class="reporte-nav" id="repNavAncla" style="display:none;">
+                                <button type="button" class="btn-icon-nav" onclick="moverPeriodoReporte(-1)"><i class='bx bx-chevron-left'></i></button>
+                                <input type="date" id="repFecha">
+                                <button type="button" class="btn-icon-nav" onclick="moverPeriodoReporte(1)"><i class='bx bx-chevron-right'></i></button>
+                            </div>
+                            <div class="reporte-nav" id="repRangoWrap" style="display:none;">
+                                <label>Desde <input type="date" id="repDesde"></label>
+                                <label>Hasta <input type="date" id="repHasta"></label>
+                            </div>
+                        </div>
+                        <h3 class="reporte-periodo-label" id="repPeriodoLabel"></h3>
 
                         <div class="table-wrap">
                             <table class="table">
