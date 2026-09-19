@@ -215,18 +215,6 @@ img {
 }
 .login__button:hover { box-shadow: 0 10px 24px hsla(var(--hue), 92%, 45%, .35); transform: translateY(-2px); }
 
-.login__hint {
-  width: 100%;
-  background: var(--container-color);
-  border-radius: .75rem;
-  padding: .85rem 1rem;
-  font-size: var(--smaller-font-size);
-  color: var(--text-color);
-  display: grid;
-  row-gap: .25rem;
-}
-.login__hint span { font-weight: var(--font-semi-bold); color: var(--title-color); }
-
 /*=============== BREAKPOINTS ===============*/
 @media screen and (max-width: 576px) {
   .login__form { padding: 2rem 1.5rem; }
