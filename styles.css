@@ -1473,14 +1473,14 @@ img {
 
 /* Botones Excel / PDF de exportación: más grandes y con color propio */
 .btn-exportar {
-  display: inline-flex; align-items: center; gap: .5rem;
-  padding: .7rem 1.4rem;
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .45rem 1rem;
   border: none; border-radius: 2rem;
-  font: inherit; font-size: var(--normal-font-size); font-weight: 600;
+  font: inherit; font-size: var(--small-font-size); font-weight: 600;
   cursor: pointer;
   transition: transform .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease;
 }
-.btn-exportar i { font-size: 1.3rem; }
+.btn-exportar i { font-size: 1.1rem; }
 .btn-exportar:hover { transform: translateY(-2px); }
 .btn-exportar--excel { background: hsl(145, 63%, 92%); color: hsl(145, 63%, 30%); }
 .btn-exportar--excel:hover { background: var(--success-color); color: #fff; box-shadow: 0 4px 12px hsla(145, 63%, 40%, .35); }
