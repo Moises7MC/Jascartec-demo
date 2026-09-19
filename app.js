@@ -2149,6 +2149,11 @@ window.addEventListener('scroll', cerrarMenuAcciones, true);
 // Registro + Reportes en un solo tab: el selector de período (por defecto "Todas las fechas")
 // recorta tanto las tarjetas como la tabla, y además respeta la sucursal elegida arriba (o el
 // negocio completo si está en "Todas las sucursales").
+// Página actual y tamaño de página de la tabla de Ventas; vuelve a 1 con cualquier cambio de
+// búsqueda, filtro o período (por eso esos eventos llaman a renderVentasDesdeInicio).
+let ventasPagina = 1;
+let ventasPorPagina = 25;
+
 function renderVentas() {
     if (!$('#repFecha').value) $('#repFecha').value = repFechaAncla;
     const tipoPeriodo = $('#repTipoPeriodo').value;
@@ -2196,10 +2201,15 @@ function renderVentas() {
 
     if (!lista.length) {
         $('#ventasBody').innerHTML = `<tr><td colspan="7" class="empty-state">${ventas.length ? 'No se encontraron ventas con esos filtros' : 'Aún no hay ventas registradas'}</td></tr>`;
+        $('#ventasPaginacion').innerHTML = '';
         return;
     }
 
-    $('#ventasBody').innerHTML = lista.map(v => {
+    const totalPaginas = Math.max(1, Math.ceil(lista.length / ventasPorPagina));
+    if (ventasPagina > totalPaginas) ventasPagina = totalPaginas;
+    const inicio = (ventasPagina - 1) * ventasPorPagina;
+
+    $('#ventasBody').innerHTML = lista.slice(inicio, inicio + ventasPorPagina).map(v => {
         const anulada = ventaEstaAnulada(v);
         return `
             <tr style="${anulada ? 'opacity:.55;' : ''}">
@@ -2225,9 +2235,28 @@ function renderVentas() {
             </tr>
         `;
     }).join('');
+
+    renderPaginacion('ventasPaginacion', {
+        total: lista.length, pagina: ventasPagina, porPagina: ventasPorPagina,
+        onCambiarPagina: 'cambiarPaginaVentas', onCambiarPorPagina: 'cambiarPorPaginaVentas'
+    });
 }
-$('#venSearch').addEventListener('input', renderVentas);
-$('#venFiltroEstado').addEventListener('change', renderVentas);
+
+function renderVentasDesdeInicio() { ventasPagina = 1; renderVentas(); }
+
+function cambiarPaginaVentas(pagina) {
+    ventasPagina = pagina;
+    renderVentas();
+}
+
+function cambiarPorPaginaVentas(valor) {
+    ventasPorPagina = parseInt(valor) || 25;
+    ventasPagina = 1;
+    renderVentas();
+}
+
+$('#venSearch').addEventListener('input', renderVentasDesdeInicio);
+$('#venFiltroEstado').addEventListener('change', renderVentasDesdeInicio);
 
 async function anularVenta(ventaId) {
     const v = ventas.find(x => x.id === ventaId);
@@ -2505,7 +2534,7 @@ function moverPeriodoReporte(direccion) {
         repFechaAncla = fechaLocalISO(d);
     }
     $('#repFecha').value = repFechaAncla;
-    renderVentas();
+    renderVentasDesdeInicio();
 }
 
 function cambiarTipoPeriodoReporte() {
@@ -2517,12 +2546,12 @@ function cambiarTipoPeriodoReporte() {
         $('#repDesde').value = repFechaAncla;
         $('#repHasta').value = repFechaAncla;
     }
-    renderVentas();
+    renderVentasDesdeInicio();
 }
 $('#repTipoPeriodo').addEventListener('change', cambiarTipoPeriodoReporte);
-$('#repFecha').addEventListener('change', () => { repFechaAncla = $('#repFecha').value || today(); renderVentas(); });
-$('#repDesde').addEventListener('change', renderVentas);
-$('#repHasta').addEventListener('change', renderVentas);
+$('#repFecha').addEventListener('change', () => { repFechaAncla = $('#repFecha').value || today(); renderVentasDesdeInicio(); });
+$('#repDesde').addEventListener('change', renderVentasDesdeInicio);
+$('#repHasta').addEventListener('change', renderVentasDesdeInicio);
 
 // Solo para el Administrador: cuánto vendió cada trabajador en el período elegido — se
 // agrupa por vendedorId; las ventas de antes de que existiera este dato (o "Cliente varios"
