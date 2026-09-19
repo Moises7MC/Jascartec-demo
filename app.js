@@ -784,10 +784,12 @@ function renderInventario() {
 
     if (!lista.length) {
         $('#inventarioBody').innerHTML = `<tr><td colspan="8" class="empty-state">No se encontraron modelos</td></tr>`;
+        limpiarPaginacion('inventario');
         return;
     }
 
-    $('#inventarioBody').innerHTML = lista.map(p => {
+    const pag = paginarTabla('inventario', lista, renderInventario, [busqueda, marcaFiltro, categoriaFiltro, sucursalActualId].join('|'));
+    $('#inventarioBody').innerHTML = pag.filas.map(p => {
         const cant = esTodasSucursales ? stockDisponible(p.id) : stockEnSucursal(p.id, sucursalActualId);
         const est = estadoStock(cant);
         // Debajo del total de la sucursal elegida, un desglose chiquito de cuánto hay en cada
@@ -816,6 +818,7 @@ function renderInventario() {
             </tr>
         `;
     }).join('');
+    pag.pintar();
     aplicarPermisos();
 }
 $('#invSearch').addEventListener('input', renderInventario);
@@ -1383,9 +1386,11 @@ function renderIngresos() {
 
     if (!lista.length) {
         $('#ingresosBody').innerHTML = '<tr><td colspan="8" class="empty-state">No se encontraron ingresos con esos filtros</td></tr>';
+        limpiarPaginacion('ingresos');
         return;
     }
-    $('#ingresosBody').innerHTML = lista.map(i => {
+    const pag = paginarTabla('ingresos', lista, renderIngresos, [busqueda, proveedorFiltro, categoriaFiltro, desde, hasta, sucursalActualId].join('|'));
+    $('#ingresosBody').innerHTML = pag.filas.map(i => {
         const total = i.equipos.reduce((s, e) => s + e.costoCompra, 0) + i.items.reduce((s, it) => s + it.costoUnit * it.cantidad, 0);
         const cantLineas = i.equipos.length + i.items.length;
         return `
@@ -2303,10 +2308,12 @@ function renderCreditos() {
 
     if (!lista.length) {
         $('#creditosBody').innerHTML = `<tr><td colspan="10" class="empty-state">${busqueda ? 'No se encontraron créditos con esa búsqueda' : 'Aún no hay ventas a crédito registradas'}</td></tr>`;
+        limpiarPaginacion('creditos');
         return;
     }
 
-    $('#creditosBody').innerHTML = lista.map(v => {
+    const pag = paginarTabla('creditos', lista, renderCreditos, `${busqueda}|${sucursalActualId}`);
+    $('#creditosBody').innerHTML = pag.filas.map(v => {
         const totalAPagar = ventaTotal(v) + (v.recargo || 0) + (v.saldoAbsorbido || 0);
         const pagado = ventaMontoPagado(v);
         const saldo = ventaSaldoPendiente(v);
@@ -2381,7 +2388,8 @@ function renderCobranzasActivos() {
     }
     lista.sort((a, b) => ventaSaldoPendiente(b) - ventaSaldoPendiente(a));
 
-    $('#cobActivosBody').innerHTML = lista.length ? lista.map(v => {
+    const pagAct = paginarTabla('cobActivos', lista, renderCobranzasActivos, `${busqueda}|${filtro}|${sucursalActualId}`);
+    $('#cobActivosBody').innerHTML = lista.length ? pagAct.filas.map(v => {
         const prox = proximaCuotaPendiente(v);
         const diasAtraso = prox ? Math.max(0, -diasParaVencer(prox.fechaVencimiento)) : 0;
         const montoTotal = v.total + (v.recargo || 0) + (v.saldoAbsorbido || 0);
@@ -2405,6 +2413,7 @@ function renderCobranzasActivos() {
             </tr>
         `;
     }).join('') : '<tr><td colspan="11" class="empty-state">No hay créditos activos con esos filtros</td></tr>';
+    if (lista.length) pagAct.pintar(); else limpiarPaginacion('cobActivos');
 }
 $('#cobSearch').addEventListener('input', renderCobranzasActivos);
 $('#cobFiltroEstado').addEventListener('change', renderCobranzasActivos);
@@ -2417,7 +2426,8 @@ function renderCobrosPorFecha() {
     const fecha = $('#cobFecha').value;
     const items = cuotasQueVencenEn(fecha);
 
-    $('#cobFechaBody').innerHTML = items.length ? items.map(({ venta: v, cuota: c }) => `
+    const pagFecha = paginarTabla('cobFecha', items, renderCobrosPorFecha, `${fecha}|${sucursalActualId}`);
+    $('#cobFechaBody').innerHTML = items.length ? pagFecha.filas.map(({ venta: v, cuota: c }) => `
         <tr>
             <td>${nombreClienteVenta(v)}</td>
             <td>${v.clienteTelefono || '—'}</td>
@@ -2431,6 +2441,7 @@ function renderCobrosPorFecha() {
             ])}</td>
         </tr>
     `).join('') : '<tr><td colspan="8" class="empty-state">No hay cobros programados para esta fecha</td></tr>';
+    if (items.length) pagFecha.pintar(); else limpiarPaginacion('cobFecha');
 }
 $('#cobFecha').addEventListener('change', renderCobrosPorFecha);
 
@@ -2693,9 +2704,11 @@ function renderFlujoCaja() {
 
     if (!movimientos.length) {
         $('#flujoCajaBody').innerHTML = '<tr><td colspan="5" class="empty-state">No hay movimientos en este período</td></tr>';
+        limpiarPaginacion('flujoCaja');
         return;
     }
-    $('#flujoCajaBody').innerHTML = [...movimientos].reverse().map(m => `
+    const pag = paginarTabla('flujoCaja', [...movimientos].reverse(), renderFlujoCaja, `${$('#cajaDesde').value}|${$('#cajaHasta').value}|${sucursalActualId}`);
+    $('#flujoCajaBody').innerHTML = pag.filas.map(m => `
         <tr>
             <td>${formatDate(m.fecha)}</td>
             <td><span class="tag ${m.tipo === 'Entrada' ? 'tag-green' : 'tag-red'}">${m.tipo}</span></td>
@@ -2704,6 +2717,7 @@ function renderFlujoCaja() {
             <td>${formatPEN(m.saldoAcumulado)}</td>
         </tr>
     `).join('');
+    pag.pintar();
 }
 $('#cajaDesde').addEventListener('change', renderFlujoCaja);
 $('#cajaHasta').addEventListener('change', renderFlujoCaja);
@@ -2919,6 +2933,7 @@ $('#formMovimientoCaja').addEventListener('submit', async (e) => {
     }
 });
 
+let historialCajaCache = [];
 async function cargarHistorialCaja() {
     let historial = [];
     try {
@@ -2929,11 +2944,19 @@ async function cargarHistorialCaja() {
     } catch (err) {
         historial = [];
     }
+    historialCajaCache = historial;
+    renderHistorialCaja();
+}
+
+function renderHistorialCaja() {
+    const historial = historialCajaCache;
     if (!historial.length) {
         $('#cajaHistorialBody').innerHTML = '<tr><td colspan="9" class="empty-state">Todavía no se registró ninguna caja</td></tr>';
+        limpiarPaginacion('cajaHistorial');
         return;
     }
-    $('#cajaHistorialBody').innerHTML = historial.map(c => `
+    const pag = paginarTabla('cajaHistorial', historial, renderHistorialCaja, String(sucursalActualId));
+    $('#cajaHistorialBody').innerHTML = pag.filas.map(c => `
         <tr>
             <td>${formatDateLong(c.fecha)}</td>
             <td>${c.sucursal}</td>
@@ -2946,6 +2969,7 @@ async function cargarHistorialCaja() {
             <td><span class="tag ${c.estado === 'Abierta' ? 'tag-amber' : 'tag-dark'}">${c.estado}</span></td>
         </tr>
     `).join('');
+    pag.pintar();
 }
 
 // ===================== PROVEEDORES =====================
@@ -3391,6 +3415,30 @@ function cambiarPorPaginaClientes(valor) {
 $('#cliSearch').addEventListener('input', () => { clientesPagina = 1; renderClientes(); });
 $('#cliFiltroEstado').addEventListener('change', () => { clientesPagina = 1; renderClientes(); });
 $('#cliFiltroEstrellas').addEventListener('change', () => { clientesPagina = 1; renderClientes(); });
+
+// Estado de paginación por tabla (id → {pagina, porPagina, firma, render}). "firma" resume los
+// filtros activos: si cambia entre un render y otro, la tabla vuelve sola a la página 1.
+const paginadores = {};
+function paginarTabla(id, lista, render, firma = '') {
+    const st = paginadores[id] ||= { pagina: 1, porPagina: 25, firma };
+    st.render = render;
+    if (st.firma !== firma) { st.firma = firma; st.pagina = 1; }
+    if (!window[`irPagina_${id}`]) {
+        window[`irPagina_${id}`] = (p) => { st.pagina = p; st.render(); };
+        window[`porPagina_${id}`] = (v) => { st.porPagina = parseInt(v) || 25; st.pagina = 1; st.render(); };
+    }
+    const totalPaginas = Math.max(1, Math.ceil(lista.length / st.porPagina));
+    if (st.pagina > totalPaginas) st.pagina = totalPaginas;
+    const inicio = (st.pagina - 1) * st.porPagina;
+    return {
+        filas: lista.slice(inicio, inicio + st.porPagina),
+        pintar: () => renderPaginacion(`${id}Paginacion`, {
+            total: lista.length, pagina: st.pagina, porPagina: st.porPagina,
+            onCambiarPagina: `irPagina_${id}`, onCambiarPorPagina: `porPagina_${id}`
+        })
+    };
+}
+function limpiarPaginacion(id) { const el = $(`#${id}Paginacion`); if (el) el.innerHTML = ''; }
 
 // Pie de página reutilizable para cualquier tabla paginada: a la izquierda el combo "Ver X" (tamaño
 // de página) + "Mostrando X–Y de Z"; a la derecha los botones redondos de navegación (primera
