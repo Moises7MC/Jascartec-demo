@@ -2155,10 +2155,12 @@ function renderVentas() {
 
     $('#ventasBody').innerHTML = lista.map(v => {
         const anulada = ventaEstaAnulada(v);
-        const { tag, texto } = tagFormaPago(v);
         return `
             <tr style="${anulada ? 'opacity:.55;' : ''}">
-                <td><strong style="${anulada ? 'text-decoration:line-through;' : ''}">${v.numBoleta}</strong></td>
+                <td>
+                    <strong style="${anulada ? 'text-decoration:line-through;' : ''}">${v.numBoleta}</strong>
+                    <span class="boleta-tipo boleta-tipo--${v.formaPago === 'Crédito' ? (ventaEstaPagada(v) ? 'pagado' : 'credito') : 'contado'}">${v.formaPago === 'Crédito' ? (ventaEstaPagada(v) ? 'Crédito · Pagado' : 'Crédito') : 'Contado'}</span>
+                </td>
                 <td>${formatDate(v.fecha)} <small class="muted">${formatHora(v.creadoEn)}</small></td>
                 <td>${v.sucursal}</td>
                 <td>${nombreClienteVenta(v)}</td>
@@ -2171,7 +2173,7 @@ function renderVentas() {
                         : `
                             ${v.formaPago === 'Crédito'
                                 ? `<button class="btn-icon-action ${ventaEstaPagada(v) ? 'btn-icon-action--exito' : 'btn-icon-action--editar'}" title="${ventaEstaPagada(v) ? 'Pagado' : 'Gestionar pago'}" onclick="abrirGestionPago(${v.id})"><i class="${ventaEstaPagada(v) ? 'ri-checkbox-circle-line' : 'ri-wallet-3-line'}"></i></button>`
-                                : `<span class="tag ${tag}" title="${texto}">${texto}</span>`}
+                                : ''}
                             <button class="btn-icon-action btn-icon-action--eliminar" title="Anular" onclick="anularVenta(${v.id})"><i class="ri-close-circle-line"></i></button>
                         `}
                 </td>
