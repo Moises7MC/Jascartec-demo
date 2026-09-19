@@ -1409,6 +1409,7 @@ function renderIngresos() {
             </tr>
         `;
     }).join('');
+    pag.pintar();
 }
 $('#ingSearch').addEventListener('input', renderIngresos);
 $('#ingFiltroCategoria').addEventListener('change', renderIngresos);
@@ -2337,6 +2338,7 @@ function renderCreditos() {
             </tr>
         `;
     }).join('');
+    pag.pintar();
 }
 $('#credSearch').addEventListener('input', renderCreditos);
 
