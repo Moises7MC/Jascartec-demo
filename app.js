@@ -2233,8 +2233,6 @@ function renderVentas() {
     const topId = Object.entries(conteoProducto).sort((a, b) => b[1] - a[1])[0]?.[0];
     $('#ventasProductoTop').textContent = topId ? nombreProducto(findProducto(parseInt(topId))) : '—';
 
-    renderReportePorVendedor(activas);
-
     // La tabla además respeta el buscador y el filtro de estado (Activas/Anuladas/Todas).
     const busqueda = ($('#venSearch').value || '').trim().toLowerCase();
     const filtroEstado = $('#venFiltroEstado').value;
@@ -2618,34 +2616,6 @@ $('#repTipoPeriodo').addEventListener('change', cambiarTipoPeriodoReporte);
 $('#repFecha').addEventListener('change', () => { repFechaAncla = $('#repFecha').value || today(); renderVentasDesdeInicio(); });
 $('#repDesde').addEventListener('change', renderVentasDesdeInicio);
 $('#repHasta').addEventListener('change', renderVentasDesdeInicio);
-
-// Solo para el Administrador: cuánto vendió cada trabajador en el período elegido — se
-// agrupa por vendedorId; las ventas de antes de que existiera este dato (o "Cliente varios"
-// hechas sin sesión identificable) caen en "Sin vendedor registrado".
-function renderReportePorVendedor(activas) {
-    const el = $('#reportePorVendedorBody');
-    if (!el) return;
-
-    const porVendedor = new Map(); // vendedorId (o null) -> { nombre, cantidad, total }
-    activas.forEach(v => {
-        const key = v.vendedorId ?? 'sin-registro';
-        const fila = porVendedor.get(key) ?? { nombre: v.vendedor || 'Sin vendedor registrado', cantidad: 0, total: 0 };
-        fila.cantidad += 1;
-        fila.total += ventaTotal(v);
-        porVendedor.set(key, fila);
-    });
-
-    const filas = [...porVendedor.values()].sort((a, b) => b.total - a.total);
-    el.innerHTML = filas.length
-        ? filas.map(f => `
-            <tr>
-                <td>${f.nombre}</td>
-                <td>${f.cantidad}</td>
-                <td>${formatPEN(f.total)}</td>
-            </tr>
-        `).join('')
-        : '<tr><td colspan="3" class="empty-state">No hay ventas registradas en este período</td></tr>';
-}
 
 // ---------- Exportar ----------
 function filasReporteParaExportar() {
