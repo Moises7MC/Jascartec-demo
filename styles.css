@@ -1470,3 +1470,19 @@ img {
 .acciones-menu .acciones-menu__exito:hover { background: hsl(145, 63%, 94%); }
 .acciones-menu .acciones-menu__peligro { color: var(--error-color); }
 .acciones-menu .acciones-menu__peligro:hover { background: hsl(0, 79%, 95%); }
+
+/* Botones Excel / PDF de exportación: más grandes y con color propio */
+.btn-exportar {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .7rem 1.4rem;
+  border: none; border-radius: 2rem;
+  font: inherit; font-size: var(--normal-font-size); font-weight: 600;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease;
+}
+.btn-exportar i { font-size: 1.3rem; }
+.btn-exportar:hover { transform: translateY(-2px); }
+.btn-exportar--excel { background: hsl(145, 63%, 92%); color: hsl(145, 63%, 30%); }
+.btn-exportar--excel:hover { background: var(--success-color); color: #fff; box-shadow: 0 4px 12px hsla(145, 63%, 40%, .35); }
+.btn-exportar--pdf { background: hsl(0, 79%, 94%); color: hsl(0, 70%, 45%); }
+.btn-exportar--pdf:hover { background: var(--error-color); color: #fff; box-shadow: 0 4px 12px hsla(0, 79%, 55%, .35); }
