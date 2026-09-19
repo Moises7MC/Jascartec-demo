@@ -2991,6 +2991,14 @@ async function cargarHistorialCaja() {
     renderHistorialCaja();
 }
 
+// Hora exacta en que se abrió/cerró la caja y cómo fue: el sistema deja escrito "Apertura
+// automática…" / "Cierre automático…" en las observaciones cuando lo hace solo; si no, fue manual.
+function horaCajaHTML(isoDateTime, observaciones, marcaAutomatico) {
+    if (!isoDateTime) return '';
+    const auto = (observaciones || '').startsWith(marcaAutomatico);
+    return `<br><small class="muted">${formatHora(isoDateTime)} · ${auto ? 'automático' : 'manual'}</small>`;
+}
+
 function renderHistorialCaja() {
     const historial = historialCajaCache;
     if (!historial.length) {
@@ -3003,9 +3011,9 @@ function renderHistorialCaja() {
         <tr>
             <td>${formatDateLong(c.fecha)}</td>
             <td>${c.sucursal}</td>
-            <td>${c.usuarioApertura}</td>
+            <td>${c.usuarioApertura}${horaCajaHTML(c.abiertaEn, c.observacionesApertura, 'Apertura automática')}</td>
             <td>${formatPEN(c.montoInicial)}</td>
-            <td>${c.usuarioCierre || '—'}</td>
+            <td>${c.usuarioCierre ? `${c.usuarioCierre}${horaCajaHTML(c.cerradaEn, c.observacionesCierre, 'Cierre automático')}` : '—'}</td>
             <td>${c.montoContadoCierre != null ? formatPEN(c.montoContadoCierre) : '—'}</td>
             <td>${formatPEN(c.efectivoEsperado)}</td>
             <td>${c.diferencia != null ? `<span class="tag ${Math.abs(c.diferencia) < 0.01 ? 'tag-green' : 'tag-red'}">${c.diferencia >= 0 ? '+' : '-'}${formatPEN(Math.abs(c.diferencia))}</span>` : '—'}</td>
