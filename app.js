@@ -2847,6 +2847,22 @@ function renderEstadoCaja() {
         return;
     }
     const nombreSucursal = findSucursal(sucursalActualId)?.nombre || '';
+    // Solo se permite UNA caja por día por sucursal: si la de hoy ya se abrió y se cerró (a mano o
+    // a las 22:00), abrir otra sería rechazado, así que en vez del botón se muestra cómo cerró.
+    const cerradaHoy = !cajaActual && historialCajaCache.find(c => c.sucursalId === sucursalActualId && c.fecha === today() && c.estado === 'Cerrada');
+    if (cerradaHoy) {
+        const auto = (cerradaHoy.observacionesCierre || '').startsWith('Cierre automático');
+        el.innerHTML = `
+            <div class="card caja-card caja-card--cerrada">
+                <div class="caja-card__icon"><i class='bx bx-lock-alt'></i></div>
+                <div class="caja-card__texto">
+                    <h3>La caja de hoy en ${nombreSucursal} ya se cerró</h3>
+                    <p class="muted">Cerró ${cerradaHoy.usuarioCierre || '—'} a las ${formatHora(cerradaHoy.cerradaEn)} (${auto ? 'cierre automático' : 'cierre manual'}). Solo hay una caja por día en cada sucursal; la de mañana se abrirá sola a las 00:00.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
     if (!cajaActual) {
         el.innerHTML = `
             <div class="card caja-card caja-card--cerrada">
@@ -3024,6 +3040,7 @@ async function cargarHistorialCaja() {
     }
     historialCajaCache = historial;
     renderHistorialCaja();
+    renderEstadoCaja(); // el panel de arriba depende de si la caja de hoy ya se cerró
 }
 
 // Hora exacta en que se abrió/cerró la caja y cómo fue: el sistema deja escrito "Apertura
