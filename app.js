@@ -2218,6 +2218,13 @@ function renderVentas() {
     $('#ventasTicketProm').textContent = formatPEN(activas.length ? totalFacturado / activas.length : 0);
     $('#ventasTotalContado').textContent = formatPEN(totalContado);
     $('#ventasTotalCredito').textContent = formatPEN(totalCredito);
+    // Yape / Tarjeta: lo vendido al contado que se pagó por ese medio (los pagos de cuotas de un
+    // crédito no entran acá: son cobros, no ventas del período).
+    const contadoPorMedio = (medio) => activas
+        .filter(v => v.formaPago !== 'Crédito' && v.medioPago === medio)
+        .reduce((s, v) => s + ventaTotal(v), 0);
+    $('#ventasTotalYape').textContent = formatPEN(contadoPorMedio('Yape'));
+    $('#ventasTotalTarjeta').textContent = formatPEN(contadoPorMedio('Tarjeta'));
 
     const conteoProducto = {};
     activas.forEach(v => v.items.forEach(it => {
@@ -3051,6 +3058,18 @@ function horaCajaHTML(isoDateTime, observaciones, marcaAutomatico) {
     return `<br><small class="muted">${formatHora(isoDateTime)} · ${auto ? 'automático' : 'manual'}</small>`;
 }
 
+// Dinero que entró en una fecha y sucursal, por medio de pago: ventas al contado + abonos de
+// créditos (incluido el inicial). La renovación de crédito no es dinero real, así que no entra.
+function cobrosPorMedioDelDia(fecha, sucursalId) {
+    const r = { Efectivo: 0, Yape: 0, Tarjeta: 0, Transferencia: 0 };
+    ventas.forEach(v => {
+        if (v.sucursalId !== sucursalId || ventaEstaAnulada(v)) return;
+        if (v.formaPago !== 'Crédito' && v.fecha === fecha && r[v.medioPago] !== undefined) r[v.medioPago] += ventaTotal(v);
+        (v.abonos || []).forEach(a => { if (a.fecha === fecha && r[a.medioPago] !== undefined) r[a.medioPago] += a.monto; });
+    });
+    return r;
+}
+
 function renderHistorialCaja() {
     if (!$('#cajaHistFecha').value) $('#cajaHistFecha').value = cajaHistAncla;
     const rango = rangoHistorialCaja();
@@ -3058,25 +3077,35 @@ function renderHistorialCaja() {
         ? historialCajaCache.filter(c => c.fecha >= rango.desde && c.fecha <= rango.hasta)
         : historialCajaCache;
     if (!historial.length) {
-        $('#cajaHistorialBody').innerHTML = `<tr><td colspan="9" class="empty-state">${historialCajaCache.length ? 'No hay cajas en ese período' : 'Todavía no se registró ninguna caja'}</td></tr>`;
+        $('#cajaHistorialBody').innerHTML = `<tr><td colspan="14" class="empty-state">${historialCajaCache.length ? 'No hay cajas en ese período' : 'Todavía no se registró ninguna caja'}</td></tr>`;
         limpiarPaginacion('cajaHistorial');
         return;
     }
     const pag = paginarTabla('cajaHistorial', historial, renderHistorialCaja,
         `${sucursalActualId}|${rango ? `${rango.desde}_${rango.hasta}` : 'todo'}`);
-    $('#cajaHistorialBody').innerHTML = pag.filas.map(c => `
+    $('#cajaHistorialBody').innerHTML = pag.filas.map(c => {
+        const cobros = cobrosPorMedioDelDia(c.fecha, c.sucursalId);
+        const totalCobrado = Object.values(cobros).reduce((a, b) => a + b, 0);
+        const monto = (n) => n > 0.004 ? formatPEN(n) : '<span class="muted">—</span>';
+        return `
         <tr>
             <td>${formatDateLong(c.fecha)}</td>
             <td>${c.sucursal}</td>
             <td>${c.usuarioApertura}${horaCajaHTML(c.abiertaEn, c.observacionesApertura, 'Apertura automática')}</td>
             <td>${formatPEN(c.montoInicial)}</td>
             <td>${c.usuarioCierre ? `${c.usuarioCierre}${horaCajaHTML(c.cerradaEn, c.observacionesCierre, 'Cierre automático')}` : '—'}</td>
+            <td>${monto(cobros.Efectivo)}</td>
+            <td>${monto(cobros.Yape)}</td>
+            <td>${monto(cobros.Tarjeta)}</td>
+            <td>${monto(cobros.Transferencia)}</td>
+            <td><strong>${monto(totalCobrado)}</strong></td>
             <td>${c.montoContadoCierre != null ? formatPEN(c.montoContadoCierre) : '—'}</td>
             <td>${formatPEN(c.efectivoEsperado)}</td>
             <td>${c.diferencia != null ? `<span class="tag ${Math.abs(c.diferencia) < 0.01 ? 'tag-green' : 'tag-red'}">${c.diferencia >= 0 ? '+' : '-'}${formatPEN(Math.abs(c.diferencia))}</span>` : '—'}</td>
             <td><span class="tag ${c.estado === 'Abierta' ? 'tag-amber' : 'tag-dark'}">${c.estado}</span></td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
     pag.pintar();
 }
 

@@ -1487,10 +1487,10 @@ img {
 .btn-exportar--pdf { background: hsl(0, 79%, 94%); color: hsl(0, 70%, 45%); }
 .btn-exportar--pdf:hover { background: var(--error-color); color: #fff; box-shadow: 0 4px 12px hsla(0, 79%, 55%, .35); }
 
-/* Tarjetas de Ventas: 2 filas de 3 columnas */
-.stats-grid--3col { grid-template-columns: repeat(3, 1fr); }
-@media (max-width: 700px) { .stats-grid--3col { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 460px) { .stats-grid--3col { grid-template-columns: 1fr; } }
+/* Tarjetas de Ventas: 2 filas de 4 columnas */
+.stats-grid--4col { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1000px) { .stats-grid--4col { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 460px) { .stats-grid--4col { grid-template-columns: 1fr; } }
 
 /* Sub-tabs tipo píldora (Todas / Contado / Crédito) */
 .pill-tabs { display: inline-flex; gap: .25rem; padding: .25rem; background: var(--container-color); border-radius: 2rem; border: 1px solid var(--border-color); }
