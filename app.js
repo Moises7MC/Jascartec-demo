@@ -2159,6 +2159,15 @@ window.addEventListener('scroll', cerrarMenuAcciones, true);
 // búsqueda, filtro o período (por eso esos eventos llaman a renderVentasDesdeInicio).
 let ventasPagina = 1;
 let ventasPorPagina = 25;
+// Sub-tab de la tabla de Registro: todas / contado / credito (solo filtra la tabla; las tarjetas
+// de arriba siguen mostrando el período completo, con su desglose contado vs crédito).
+let ventasTipoFiltro = 'todos';
+
+function cambiarTipoVenta(tipo) {
+    ventasTipoFiltro = tipo;
+    $$('#venTipoTabs .pill-tab').forEach(b => b.classList.toggle('active', b.dataset.tipo === tipo));
+    renderVentasDesdeInicio();
+}
 
 function renderVentas() {
     if (!$('#repFecha').value) $('#repFecha').value = repFechaAncla;
@@ -2197,6 +2206,8 @@ function renderVentas() {
     let lista = [...ventasSucursal].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
     if (filtroEstado === 'activas') lista = lista.filter(v => !ventaEstaAnulada(v));
     else if (filtroEstado === 'anuladas') lista = lista.filter(v => ventaEstaAnulada(v));
+    if (ventasTipoFiltro === 'contado') lista = lista.filter(v => v.formaPago !== 'Crédito');
+    else if (ventasTipoFiltro === 'credito') lista = lista.filter(v => v.formaPago === 'Crédito');
 
     if (busqueda) {
         lista = lista.filter(v => {

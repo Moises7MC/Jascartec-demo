@@ -1491,3 +1491,16 @@ img {
 .stats-grid--3col { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 700px) { .stats-grid--3col { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 460px) { .stats-grid--3col { grid-template-columns: 1fr; } }
+
+/* Sub-tabs tipo píldora (Todas / Contado / Crédito) */
+.pill-tabs { display: inline-flex; gap: .25rem; padding: .25rem; background: var(--container-color); border-radius: 2rem; border: 1px solid var(--border-color); }
+.pill-tab {
+  padding: .4rem 1rem;
+  border: none; background: none; border-radius: 2rem;
+  font: inherit; font-size: var(--small-font-size); font-weight: 600;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.pill-tab:hover:not(.active) { background: var(--first-color-light); color: var(--first-color-alt); }
+.pill-tab.active { background: var(--first-color); color: #fff; }

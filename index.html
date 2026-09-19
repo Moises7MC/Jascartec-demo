@@ -582,6 +582,11 @@
                                 <label>Desde <input type="date" id="repDesde"></label>
                                 <label>Hasta <input type="date" id="repHasta"></label>
                             </div>
+                            <div class="pill-tabs" id="venTipoTabs">
+                                <button type="button" class="pill-tab active" data-tipo="todos" onclick="cambiarTipoVenta('todos')">Todas</button>
+                                <button type="button" class="pill-tab" data-tipo="contado" onclick="cambiarTipoVenta('contado')">Contado</button>
+                                <button type="button" class="pill-tab" data-tipo="credito" onclick="cambiarTipoVenta('credito')">Crédito</button>
+                            </div>
                         </div>
                         <h3 class="reporte-periodo-label" id="repPeriodoLabel"></h3>
 
